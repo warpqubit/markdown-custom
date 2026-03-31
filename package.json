@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MI_USUARIO/markdown-custom.git"
+    "url": "git+https://github.com/warpqubit/markdown-custom.git"
   },
   "keywords": ["claude", "skills", "markdown", "ai", "anthropic"],
   "license": "MIT",

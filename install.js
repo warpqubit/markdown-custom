@@ -87,7 +87,7 @@ async function install() {
   const dest    = path.join(desktop, 'markdown-custom');
 
   // Leer repo URL desde package.json del instalador (o usar placeholder)
-  let repoUrl = 'https://github.com/MI_USUARIO/markdown-custom.git';
+  let repoUrl = 'https://github.com/warpqubit/markdown-custom.git';
   try {
     // Si estamos corriendo vía npx desde un paquete publicado,
     // __dirname apunta al directorio del paquete donde está install.js
