@@ -187,7 +187,7 @@
   flex-shrink: 0;
 }
 
-.btn-catalog {
+.btn-import {
   width: 100%;
   padding: 8px 10px;
   background: transparent;
@@ -202,9 +202,9 @@
   gap: 5px;
   transition: background .12s, color .12s, border-color .12s;
 }
-.btn-catalog:hover {
-  background: var(--warning-light);
-  color: var(--accent);
-  border-color: var(--accent);
+.btn-import:hover {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: var(--primary);
   border-style: solid;
 }

@@ -1,6 +1,5 @@
-// app.js — Orquestador principal — Markdown Custom v1.1
-import { FS }      from './fs.js';
-import { Catalog } from './catalog.js';
+// app.js — Orquestador principal — Markdown Custom v1.2
+import { FS } from './fs.js';
 
 // ---- ESTADO ----
 const S = {
@@ -44,21 +43,30 @@ const UI = {
   btnExport:        el('btn-export-skill'),
   btnDelete:        el('btn-delete-skill'),
   // Modals
-  modalNew:          el('modal-new-skill'),
-  newName:           el('new-skill-name'),
-  newTemplate:       el('new-file-template'),
-  newDir:            el('new-skill-dir'),
-  newPreview:        el('new-skill-preview-path'),
-  btnConfirmNew:     el('btn-confirm-new-skill'),
-  modalDelete:       el('modal-delete'),
-  deleteSkillName:   el('delete-skill-name'),
-  btnConfirmDelete:  el('btn-confirm-delete'),
-  modalUnsaved:      el('modal-unsaved'),
-  unsavedSkillName:  el('unsaved-skill-name'),
-  btnUnsavedDiscard: el('btn-unsaved-discard'),
-  btnUnsavedSave:    el('btn-unsaved-save'),
-  modalCatalog:      el('modal-catalog'),
-  compatWarning:     el('compat-warning'),
+  modalNew:           el('modal-new-skill'),
+  newName:            el('new-skill-name'),
+  newTemplate:        el('new-file-template'),
+  newDir:             el('new-skill-dir'),
+  newPreview:         el('new-skill-preview-path'),
+  btnConfirmNew:      el('btn-confirm-new-skill'),
+  modalDelete:        el('modal-delete'),
+  deleteSkillName:    el('delete-skill-name'),
+  btnConfirmDelete:   el('btn-confirm-delete'),
+  modalUnsaved:       el('modal-unsaved'),
+  unsavedSkillName:   el('unsaved-skill-name'),
+  btnUnsavedDiscard:  el('btn-unsaved-discard'),
+  btnUnsavedSave:     el('btn-unsaved-save'),
+  // Import
+  modalImport:        el('modal-import'),
+  btnImport:          el('btn-import'),
+  btnPickFile:        el('btn-pick-file'),
+  importFileName:     el('import-file-name'),
+  importFileError:    el('import-file-error'),
+  importDestDir:      el('import-dest-dir'),
+  importPreviewPath:  el('import-preview-path'),
+  importConflict:     el('import-conflict-notice'),
+  btnConfirmImport:   el('btn-confirm-import'),
+  compatWarning:      el('compat-warning'),
 };
 
 // =============================================
@@ -244,7 +252,11 @@ function bindEvents() {
     o.addEventListener('click', e => { if (e.target === o) closeModal(o.id); })
   );
 
-  window.addEventListener('catalog-error', e => toast(e.detail, 'error'));
+  // Importar .md
+  UI.btnImport.addEventListener('click', openImportModal);
+  UI.btnPickFile.addEventListener('click', pickImportFile);
+  UI.importDestDir.addEventListener('change', refreshImportPreview);
+  UI.btnConfirmImport.addEventListener('click', confirmImport);
 }
 
 // =============================================
@@ -274,10 +286,6 @@ async function loadSkills() {
     const found = await FS.findMarkdownFiles();
     S.skills = [...found, ...virtualSkills];
     renderList();
-    Catalog.init(S.skills, async (installedName) => {
-      await loadSkills();
-      toast(`Skill "${installedName}" instalado`, 'success');
-    });
   } catch (e) {
     UI.skillList.innerHTML = '<li class="skill-empty">Error al leer el directorio</li>';
     toast('Error leyendo el directorio', 'error');
@@ -660,6 +668,153 @@ async function confirmDelete() {
   } catch (e) {
     toast('Error al eliminar: ' + e.message, 'error');
     closeModal('modal-delete');
+  }
+}
+
+// =============================================
+// IMPORTAR .md
+// =============================================
+// Estado temporal del modal de importar
+const IMP = { file: null, baseName: '' };
+
+async function openImportModal() {
+  // Reset estado
+  IMP.file     = null;
+  IMP.baseName = '';
+  UI.importFileName.textContent    = 'Ningún archivo seleccionado';
+  UI.importFileError.classList.add('hidden');
+  UI.importConflict.classList.add('hidden');
+  UI.importPreviewPath.textContent = '—';
+  UI.btnConfirmImport.disabled     = true;
+
+  // Poblar directorios destino
+  try {
+    S.directories = await FS.findDirectories();
+    UI.importDestDir.innerHTML = '';
+    S.directories.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.path;
+      opt.text  = d.label;
+      UI.importDestDir.appendChild(opt);
+    });
+  } catch (_) {
+    UI.importDestDir.innerHTML = '<option value="">/ raíz</option>';
+    S.directories = [{ label: '/ raíz', path: '', handle: FS.rootHandle }];
+  }
+
+  openModal('modal-import');
+}
+
+async function pickImportFile() {
+  try {
+    const [fileHandle] = await window.showOpenFilePicker({
+      types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+      multiple: false,
+    });
+    const file = await fileHandle.getFile();
+
+    // Validar extensión
+    if (!file.name.toLowerCase().endsWith('.md')) {
+      UI.importFileError.classList.remove('hidden');
+      UI.importFileName.textContent = file.name;
+      UI.btnConfirmImport.disabled  = true;
+      IMP.file = null;
+      return;
+    }
+
+    UI.importFileError.classList.add('hidden');
+    IMP.file     = file;
+    IMP.baseName = file.name;
+    UI.importFileName.textContent = file.name;
+
+    refreshImportPreview();
+  } catch (e) {
+    if (e.name !== 'AbortError') toast('No se pudo seleccionar el archivo', 'error');
+  }
+}
+
+function _resolveImportName(baseName, destPath) {
+  // Devuelve { finalName, conflict }
+  // Verifica si ya existe en S.skills (incluyendo virtuales)
+  const check = name => {
+    const candidate = destPath ? `${destPath}/${name}` : name;
+    return S.skills.some(s => s.path === candidate);
+  };
+
+  if (!check(baseName)) return { finalName: baseName, conflict: false };
+
+  // Generar nombre sin conflicto: nombre-2.md, nombre-3.md, ...
+  const stem = baseName.replace(/\.md$/i, '');
+  let n = 2;
+  while (n < 100) {
+    const candidate = `${stem}-${n}.md`;
+    if (!check(candidate)) return { finalName: candidate, conflict: true };
+    n++;
+  }
+  return { finalName: `${stem}-${Date.now()}.md`, conflict: true };
+}
+
+function refreshImportPreview() {
+  if (!IMP.file) return;
+
+  const destPath = UI.importDestDir.value;
+  const { finalName, conflict } = _resolveImportName(IMP.baseName, destPath);
+
+  const fullPath = destPath ? `${destPath}/${finalName}` : finalName;
+  UI.importPreviewPath.textContent = fullPath;
+
+  if (conflict) {
+    UI.importConflict.classList.remove('hidden');
+    UI.importConflict.textContent =
+      `Ya existe "${IMP.baseName}" en ese directorio. Se importará como "${finalName}".`;
+  } else {
+    UI.importConflict.classList.add('hidden');
+  }
+
+  UI.btnConfirmImport.disabled = false;
+  IMP._resolvedName = finalName;
+}
+
+async function confirmImport() {
+  if (!IMP.file) return;
+
+  const destPath    = UI.importDestDir.value;
+  const finalName   = IMP._resolvedName || IMP.baseName;
+  const dirEntry    = S.directories.find(d => d.path === destPath);
+  const targetHandle = dirEntry ? dirEntry.handle : FS.rootHandle;
+
+  UI.btnConfirmImport.disabled = true;
+  UI.btnConfirmImport.textContent = 'Importando...';
+
+  try {
+    // Leer contenido del archivo origen
+    const content = await IMP.file.text();
+
+    // Crear el archivo en el destino
+    const newHandle = await targetHandle.getFileHandle(finalName, { create: true });
+    await FS.writeFile(newHandle, content);
+
+    // Detectar fileType del archivo importado
+    const fileType = await FS._detectFileType(finalName, newHandle, destPath);
+    const name     = finalName.replace(/\.md$/i, '');
+    const fullPath = destPath ? `${destPath}/${finalName}` : finalName;
+
+    const newSkill = {
+      name, path: fullPath, handle: newHandle,
+      dirHandle: targetHandle, dir: destPath,
+      virtual: false, fileType,
+    };
+
+    S.skills.push(newSkill);
+    closeModal('modal-import');
+    renderList();
+    await openSkill(newSkill);
+    toast(`"${finalName}" importado correctamente`, 'success');
+  } catch (e) {
+    toast('Error al importar: ' + e.message, 'error');
+  } finally {
+    UI.btnConfirmImport.disabled    = false;
+    UI.btnConfirmImport.textContent = 'Importar';
   }
 }
 

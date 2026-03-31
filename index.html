@@ -97,8 +97,8 @@
         </div>
         <ul id="skill-list"></ul>
         <div class="sidebar-footer">
-          <button id="btn-catalog" class="btn-catalog">
-            + Agregar desde catálogo
+          <button id="btn-import" class="btn-import">
+            ↑ Importar .md
           </button>
         </div>
       </aside>
@@ -233,23 +233,36 @@
     </div>
   </div>
 
-  <!-- MODAL: CATÁLOGO -->
-  <div id="modal-catalog" class="modal-overlay hidden">
-    <div class="modal modal-lg">
+  <!-- MODAL: IMPORTAR .md -->
+  <div id="modal-import" class="modal-overlay hidden">
+    <div class="modal">
       <div class="modal-head">
-        <span class="modal-title">Catálogo de skills</span>
-        <button class="modal-close" data-modal="modal-catalog">×</button>
+        <span class="modal-title">Importar archivo .md</span>
+        <button class="modal-close" data-modal="modal-import">×</button>
       </div>
-      <div class="catalog-search-wrap">
-        <input id="catalog-search" type="text" placeholder="Buscar en el catálogo..."/>
-      </div>
-      <div id="catalog-tags" class="catalog-tags-bar"></div>
-      <div id="catalog-body" class="catalog-body">
-        <div class="catalog-loading">Cargando catálogo...</div>
+      <div class="modal-body">
+        <label class="field-label">Archivo a importar</label>
+        <div id="import-file-wrap" class="import-file-wrap">
+          <span id="import-file-name" class="import-file-name">Ningún archivo seleccionado</span>
+          <button id="btn-pick-file" class="btn-ghost btn-sm">Elegir archivo</button>
+        </div>
+        <p id="import-file-error" class="import-file-error hidden">Solo se permiten archivos .md</p>
+
+        <label class="field-label" style="margin-top:12px">Directorio destino</label>
+        <select id="import-dest-dir" class="field-input field-select">
+          <option value="">/ raíz</option>
+        </select>
+
+        <p class="field-hint" style="margin-top:8px">
+          Se importará como: <code id="import-preview-path">—</code>
+        </p>
+        <p id="import-conflict-notice" class="import-conflict-notice hidden">
+          Ya existe un archivo con ese nombre. Se renombrará automáticamente.
+        </p>
       </div>
       <div class="modal-footer">
-        <span id="catalog-source" class="catalog-source">github.com/anthropics/skills</span>
-        <button class="btn-ghost" data-modal="modal-catalog">Cerrar</button>
+        <button class="btn-ghost" data-modal="modal-import">Cancelar</button>
+        <button id="btn-confirm-import" class="btn-primary" disabled>Importar</button>
       </div>
     </div>
   </div>
