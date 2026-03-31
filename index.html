@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Markdown Custom</title>
+
+  <!-- Anti-FOUC: aplicar tema antes de renderizar -->
+  <script>
+    (function(){
+      var saved = localStorage.getItem('mc_theme');
+      var pref  = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', pref);
+    })();
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@400;700;900&display=swap" rel="stylesheet"/>
+
+  <link rel="stylesheet" href="styles/main.css"/>
+  <link rel="stylesheet" href="styles/sidebar.css"/>
+  <link rel="stylesheet" href="styles/editor.css"/>
+  <link rel="stylesheet" href="styles/catalog.css"/>
+</head>
+<body>
+
+  <!-- PANTALLA DE BIENVENIDA -->
+  <div id="welcome-screen">
+    <div class="welcome-inner">
+      <div class="welcome-logo">
+        <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+          <rect width="52" height="52" rx="14" fill="#D4A853"/>
+          <rect x="11" y="14" width="30" height="3" rx="1.5" fill="white" opacity="0.95"/>
+          <rect x="11" y="22" width="21" height="3" rx="1.5" fill="white" opacity="0.75"/>
+          <rect x="11" y="30" width="25" height="3" rx="1.5" fill="white" opacity="0.55"/>
+          <path d="M32 26 L38 32 L32 38" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        </svg>
+        <div class="welcome-brand">
+          <span class="brand-main">Markdown Custom</span>
+          <span class="brand-sub">skill manager · v1.0</span>
+        </div>
+      </div>
+      <p class="welcome-desc">
+        Conectá tu proyecto y gestioná todos tus skills locales.<br/>
+        Detecta automáticamente cualquier <code>SKILL.md</code> en el directorio.
+      </p>
+      <button id="btn-connect" class="btn-primary">
+        Conectar directorio
+      </button>
+      <p id="compat-warning" class="welcome-note hidden" style="color:var(--danger)">
+        ⚠ Este browser no soporta File System Access API.<br/>Usá Chrome o Edge.
+      </p>
+      <p class="welcome-note">Requiere Chrome 86+ o Edge 86+</p>
+    </div>
+  </div>
+
+  <!-- APP SHELL -->
+  <div id="app-shell" class="hidden">
+
+    <header id="topbar">
+      <div class="topbar-left">
+        <div class="topbar-logo">
+          <svg width="22" height="22" viewBox="0 0 52 52" fill="none">
+            <rect width="52" height="52" rx="14" fill="#D4A853"/>
+            <rect x="11" y="14" width="30" height="3" rx="1.5" fill="white" opacity="0.95"/>
+            <rect x="11" y="22" width="21" height="3" rx="1.5" fill="white" opacity="0.75"/>
+            <rect x="11" y="30" width="25" height="3" rx="1.5" fill="white" opacity="0.55"/>
+            <path d="M32 26 L38 32 L32 38" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+          <span class="topbar-title">Markdown Custom</span>
+        </div>
+        <span class="topbar-sep">·</span>
+        <span id="topbar-path" class="topbar-path">sin directorio</span>
+      </div>
+      <div class="topbar-right">
+        <button id="btn-reload" class="btn-ghost" title="Recargar skills">↺ Recargar</button>
+        <button id="btn-change-dir" class="btn-ghost">Cambiar directorio</button>
+        <button id="btn-theme-toggle" class="btn-theme" title="Cambiar tema" aria-label="Cambiar tema">
+          <span id="theme-icon-sun" class="theme-icon">☀</span>
+          <span id="theme-icon-moon" class="theme-icon hidden">☽</span>
+        </button>
+      </div>
+    </header>
+
+    <div id="main-layout">
+
+      <aside id="sidebar">
+        <div class="sidebar-head">
+          <span class="sidebar-label">Skills</span>
+          <span id="skills-count" class="sidebar-count">0</span>
+          <button id="btn-new-skill" class="sidebar-add" title="Crear nuevo skill">+</button>
+        </div>
+        <div id="skill-search-wrap">
+          <input id="skill-search" type="text" placeholder="Buscar skill..." autocomplete="off"/>
+        </div>
+        <ul id="skill-list"></ul>
+        <div class="sidebar-footer">
+          <button id="btn-catalog" class="btn-catalog">
+            + Agregar desde catálogo
+          </button>
+        </div>
+      </aside>
+
+      <main id="content-area">
+        <div id="empty-state">
+          <svg width="36" height="36" viewBox="0 0 36 36" fill="none" opacity="0.25">
+            <rect x="5" y="3" width="26" height="30" rx="4" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M11 12h14M11 17h9M11 22h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <p>Seleccioná un skill para editarlo</p>
+        </div>
+
+        <div id="editor-panel" class="hidden">
+          <div id="editor-topbar">
+            <div class="editor-breadcrumb">
+              <span id="editor-skill-name" class="editor-skill-name"></span>
+              <span class="editor-sep">/</span>
+              <span class="editor-file">SKILL.md</span>
+            </div>
+            <div class="editor-actions">
+              <span id="editor-skill-badge" class="skill-badge hidden"></span>
+              <button id="btn-delete-skill" class="btn-danger-ghost">eliminar skill</button>
+            </div>
+          </div>
+
+          <div id="editor-body">
+            <div id="editor-pane">
+              <div class="pane-label">Editor</div>
+              <textarea id="editor-textarea" spellcheck="false" placeholder="# Nombre del skill&#10;&#10;Escribí las instrucciones del skill..."></textarea>
+            </div>
+            <div id="preview-pane">
+              <div class="pane-label">Preview</div>
+              <div id="editor-preview"></div>
+            </div>
+          </div>
+
+          <div id="editor-statusbar">
+            <div class="status-left">
+              <span id="status-indicator" class="status-dot saved"></span>
+              <span id="status-text" class="status-text">guardado</span>
+              <span class="status-sep">·</span>
+              <span id="status-path" class="status-path"></span>
+            </div>
+            <div class="status-center">
+              <span id="status-line-col" class="status-info">Ln 1, Col 1</span>
+              <span class="status-sep">·</span>
+              <span id="status-filesize" class="status-info">0 B</span>
+            </div>
+            <div class="status-right">
+              <button id="btn-save" class="btn-save" disabled>Guardar  Ctrl+S</button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- MODAL: NUEVO SKILL -->
+  <div id="modal-new-skill" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="modal-title">Nuevo skill</span>
+        <button class="modal-close" data-modal="modal-new-skill">×</button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label">Nombre del skill</label>
+        <input id="new-skill-name" type="text" class="field-input" placeholder="ej: python-scripts" autocomplete="off"/>
+        <p class="field-hint">Se creará: <code id="new-skill-preview-path">skills/nombre/SKILL.md</code></p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-modal="modal-new-skill">Cancelar</button>
+        <button id="btn-confirm-new-skill" class="btn-primary">Crear skill</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR ELIMINAR -->
+  <div id="modal-delete" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-head">
+        <span class="modal-title">Eliminar skill</span>
+        <button class="modal-close" data-modal="modal-delete">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-text">¿Eliminar el skill <strong id="delete-skill-name"></strong>?</p>
+        <p class="modal-subtext">Esto borra el <code>SKILL.md</code> del disco. No se puede deshacer.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-modal="modal-delete">Cancelar</button>
+        <button id="btn-confirm-delete" class="btn-danger">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CAMBIOS SIN GUARDAR -->
+  <div id="modal-unsaved" class="modal-overlay hidden">
+    <div class="modal modal-sm">
+      <div class="modal-head">
+        <span class="modal-title">Cambios sin guardar</span>
+      </div>
+      <div class="modal-body">
+        <p class="modal-text">Tenés cambios sin guardar en <strong id="unsaved-skill-name"></strong>.</p>
+        <p class="modal-subtext">¿Qué querés hacer?</p>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-unsaved-discard" class="btn-ghost">Descartar</button>
+        <button id="btn-unsaved-save" class="btn-primary">Guardar y continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CATÁLOGO -->
+  <div id="modal-catalog" class="modal-overlay hidden">
+    <div class="modal modal-lg">
+      <div class="modal-head">
+        <span class="modal-title">Catálogo de skills</span>
+        <button class="modal-close" data-modal="modal-catalog">×</button>
+      </div>
+      <div class="catalog-search-wrap">
+        <input id="catalog-search" type="text" placeholder="Buscar en el catálogo..."/>
+      </div>
+      <div id="catalog-body" class="catalog-body">
+        <div class="catalog-loading">Cargando catálogo...</div>
+      </div>
+      <div class="modal-footer">
+        <span id="catalog-source" class="catalog-source">github.com/anthropics/skills</span>
+        <button class="btn-ghost" data-modal="modal-catalog">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>

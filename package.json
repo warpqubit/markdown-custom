@@ -1,0 +1,21 @@
+{
+  "name": "markdown-custom",
+  "version": "1.0.0",
+  "description": "Local SKILL.md manager — browse, edit and install skills from the Claude ecosystem",
+  "main": "install.js",
+  "bin": {
+    "markdown-custom": "./install.js"
+  },
+  "scripts": {
+    "start": "npx serve . -l 3000"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MI_USUARIO/markdown-custom.git"
+  },
+  "keywords": ["claude", "skills", "markdown", "ai", "anthropic"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
