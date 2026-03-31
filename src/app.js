@@ -13,7 +13,12 @@ const S = {
   githubToken:      '',
   githubSkills:     [],     // resultados de la última búsqueda
   githubPanelOpen:  false,
+  githubPage:       1,
+  githubPerPage:    10,
 };
+
+// Estado temporal del modal de instalación de GitHub skills
+const GHI = { item: null, skillName: '', _resolvedName: '' };
 
 // ---- DOM ----
 const el = id => document.getElementById(id);
@@ -87,6 +92,19 @@ const UI = {
   gspTokenInput:        el('gsp-token-input'),
   btnGspTokenAccept:    el('btn-gsp-token-accept'),
   btnGspTokenClear:     el('btn-gsp-token-clear'),
+  // GitHub pagination
+  gspPagination:        el('gsp-pagination'),
+  gspPageInfo:          el('gsp-page-info'),
+  btnGspPrev:           el('btn-gsp-prev'),
+  btnGspNext:           el('btn-gsp-next'),
+  gspPerPage:           el('gsp-per-page'),
+  // Install modal
+  modalGhInstall:       el('modal-gh-install'),
+  ghiSkillName:         el('ghi-skill-name'),
+  ghiDestDir:           el('ghi-dest-dir'),
+  ghiPreviewPath:       el('ghi-preview-path'),
+  ghiConflict:          el('ghi-conflict-notice'),
+  btnGhiConfirm:        el('btn-ghi-confirm'),
 };
 
 // =============================================
@@ -289,6 +307,25 @@ function bindEvents() {
   UI.btnPickFile.addEventListener('click', pickImportFile);
   UI.importDestDir.addEventListener('change', refreshImportPreview);
   UI.btnConfirmImport.addEventListener('click', confirmImport);
+
+  // GitHub pagination
+  UI.btnGspPrev.addEventListener('click', () => {
+    S.githubPage--;
+    _renderGithubSkills(S.githubSkills);
+  });
+  UI.btnGspNext.addEventListener('click', () => {
+    S.githubPage++;
+    _renderGithubSkills(S.githubSkills);
+  });
+  UI.gspPerPage.addEventListener('change', () => {
+    S.githubPerPage = +UI.gspPerPage.value;
+    S.githubPage    = 1;
+    _renderGithubSkills(S.githubSkills);
+  });
+
+  // Install modal
+  UI.ghiDestDir.addEventListener('change', _updateInstallPreview);
+  UI.btnGhiConfirm.addEventListener('click', confirmGhInstall);
 }
 
 // =============================================
@@ -764,6 +801,7 @@ async function runGithubSearch() {
   const query = UI.gspSearchInput.value.trim();
   if (!query) { UI.gspSearchInput.focus(); return; }
 
+  S.githubPage = 1;
   UI.btnGspSearch.disabled    = true;
   UI.btnGspSearch.textContent = '...';
   UI.gspCount.classList.add('hidden');
@@ -822,6 +860,8 @@ function _renderGithubSkills(items) {
   UI.gspBody.innerHTML = '';
 
   if (!items.length) {
+    UI.gspCount.classList.add('hidden');
+    UI.gspPagination.classList.add('hidden');
     const empty = document.createElement('div');
     empty.className   = 'gsp-empty';
     empty.textContent = 'Sin resultados. Probá otro término.';
@@ -829,16 +869,32 @@ function _renderGithubSkills(items) {
     return;
   }
 
-  UI.gspCount.textContent = items.length;
+  const total      = items.length;
+  const perPage    = S.githubPerPage;
+  const totalPages = Math.ceil(total / perPage);
+  S.githubPage     = Math.min(Math.max(1, S.githubPage), totalPages);
+  const start      = (S.githubPage - 1) * perPage;
+  const end        = Math.min(start + perPage, total);
+  const pageItems  = items.slice(start, end);
+
+  UI.gspCount.textContent = total;
   UI.gspCount.classList.remove('hidden');
 
-  items.forEach(item => UI.gspBody.appendChild(_buildGithubCard(item)));
+  UI.gspPagination.classList.remove('hidden');
+  UI.gspPageInfo.textContent  = `${start + 1}–${end} de ${total}`;
+  UI.btnGspPrev.disabled      = S.githubPage <= 1;
+  UI.btnGspNext.disabled      = S.githubPage >= totalPages;
+  UI.gspPerPage.value         = String(perPage);
+
+  pageItems.forEach(item => UI.gspBody.appendChild(_buildGithubCard(item)));
 }
 
 function _buildGithubCard(item) {
   const hasDir      = !!FS.rootHandle;
   const m           = item.metrics;
   const displayName = m.name || item.path.split('/').slice(-2, -1)[0] || item.repo;
+  const abbr        = displayName.slice(0, 3).toUpperCase();
+  const repoShort   = item.repo.split('/')[1] || item.repo;
   const dateStr     = item.updatedAt
     ? new Date(item.updatedAt).toLocaleDateString('es-AR',
         { day: '2-digit', month: 'short', year: '2-digit' })
@@ -846,93 +902,99 @@ function _buildGithubCard(item) {
 
   const card = document.createElement('div');
   card.className = 'gsp-card';
+  if (!item.content) card.classList.add('gsp-card--no-content');
 
-  // — Zona clicable (abre en editor) —
-  const top = document.createElement('div');
-  top.className = 'gsp-card-top';
-  top.title     = 'Clic para ver en el editor';
+  // — Fila 1: icono + nombre + badge palabras —
+  const header = document.createElement('div');
+  header.className = 'gsp-card-header';
 
-  const nameEl = document.createElement('div');
-  nameEl.className   = 'gsp-card-name';
-  nameEl.textContent = displayName;
+  const icon = document.createElement('div');
+  icon.className   = 'gsp-card-icon';
+  icon.textContent = abbr;
 
-  const repoEl = document.createElement('div');
-  repoEl.className   = 'gsp-card-repo';
-  repoEl.textContent = item.repo;
+  const titleEl = document.createElement('div');
+  titleEl.className   = 'gsp-card-title';
+  titleEl.textContent = displayName;
 
-  const pathEl = document.createElement('div');
-  pathEl.className   = 'gsp-card-path';
-  pathEl.textContent = item.path;
+  const wBadge = document.createElement('span');
+  wBadge.className   = 'gsp-word-badge';
+  wBadge.textContent = `${m.wordCount}w`;
 
-  top.appendChild(nameEl);
-  top.appendChild(repoEl);
-  top.appendChild(pathEl);
+  header.appendChild(icon);
+  header.appendChild(titleEl);
+  header.appendChild(wBadge);
+  card.appendChild(header);
 
+  // — Fila 2: descripción —
   if (m.description) {
     const desc = document.createElement('div');
     desc.className   = 'gsp-card-desc';
     desc.textContent = m.description;
-    top.appendChild(desc);
+    card.appendChild(desc);
   }
 
-  // Métricas
+  // — Fila 3: tags —
+  const tags = document.createElement('div');
+  tags.className = 'gsp-card-tags';
+
+  const tagGh = document.createElement('span');
+  tagGh.className   = 'c-tag community';
+  tagGh.textContent = 'GitHub';
+  tags.appendChild(tagGh);
+
+  if (m.hasExamples) {
+    const t = document.createElement('span');
+    t.className = 'c-tag verified'; t.textContent = '✓ ejemplos';
+    tags.appendChild(t);
+  }
+  if (m.hasTriggers) {
+    const t = document.createElement('span');
+    t.className = 'c-tag verified'; t.textContent = '✓ triggers';
+    tags.appendChild(t);
+  }
+
+  const tagRepo = document.createElement('span');
+  tagRepo.className   = 'c-tag repo-tag';
+  tagRepo.title       = item.repo;
+  tagRepo.textContent = repoShort;
+  tags.appendChild(tagRepo);
+  card.appendChild(tags);
+
+  // — Fila 4: métricas + botón instalar —
+  const footer = document.createElement('div');
+  footer.className = 'gsp-card-footer';
+
   const metricsEl = document.createElement('div');
   metricsEl.className = 'gsp-card-metrics';
-  const addM = (text) => {
-    const s = document.createElement('span');
-    s.className = 'gsp-metric'; s.textContent = text;
-    metricsEl.appendChild(s);
-  };
-  addM(`⭐ ${item.stars.toLocaleString()}`);
-  addM(`🍴 ${item.forks.toLocaleString()}`);
-  addM(`📅 ${dateStr}`);
-  top.appendChild(metricsEl);
+  metricsEl.innerHTML =
+    `<span class="${item.stars > 50 ? 'gsp-metric-hot' : ''}">★ ${item.stars.toLocaleString()}</span>` +
+    ` · <span>↓ ${item.forks.toLocaleString()}</span>` +
+    ` · <span>↻ ${dateStr}</span>`;
+  footer.appendChild(metricsEl);
 
-  // Tags
-  if (m.hasExamples || m.hasTriggers) {
-    const tagsEl = document.createElement('div');
-    tagsEl.className = 'gsp-card-tags';
-    if (m.hasTriggers) { const t = document.createElement('span'); t.className = 'gsp-tag'; t.textContent = 'triggers'; tagsEl.appendChild(t); }
-    if (m.hasExamples) { const t = document.createElement('span'); t.className = 'gsp-tag'; t.textContent = 'ejemplos'; tagsEl.appendChild(t); }
-    top.appendChild(tagsEl);
-  }
-
-  // Click en la card → abre en editor y cierra panel
-  if (item.content) {
-    top.addEventListener('click', () => {
-      openGithubPreview(item, displayName);
-      closeGithubPanel();
-    });
-  } else {
-    top.style.opacity = '.6';
-    top.style.cursor  = 'default';
-  }
-
-  card.appendChild(top);
-
-  // — Acción importar —
-  const actions = document.createElement('div');
-  actions.className = 'gsp-card-actions';
-
-  const hint = document.createElement('span');
-  hint.className   = 'gsp-card-hint';
-  hint.textContent = item.content ? 'Clic para abrir en editor' : 'Sin contenido disponible';
-  actions.appendChild(hint);
-
-  const btnImp = document.createElement('button');
-  btnImp.className   = 'gsp-btn-import';
-  btnImp.textContent = 'Importar';
-  btnImp.disabled    = !hasDir || !item.content;
-  if (!hasDir)       btnImp.title = 'Conectá un directorio primero';
-  if (!item.content) btnImp.title = 'Contenido no disponible';
+  const btnInst = document.createElement('button');
+  btnInst.className   = 'btn-install';
+  btnInst.textContent = 'Instalar';
+  btnInst.disabled    = !hasDir || !item.content;
+  if (!hasDir)       btnInst.title = 'Conectá un directorio primero';
+  if (!item.content) btnInst.title = 'Contenido no disponible';
   if (hasDir && item.content) {
-    btnImp.addEventListener('click', e => {
+    btnInst.addEventListener('click', e => {
       e.stopPropagation();
-      importGithubSkill(item.content, displayName, btnImp);
+      openInstallModal(item, displayName);
     });
   }
-  actions.appendChild(btnImp);
-  card.appendChild(actions);
+  footer.appendChild(btnInst);
+  card.appendChild(footer);
+
+  // Click en la card (no en instalar) → preview en editor, panel NO se cierra
+  if (item.content) {
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', e => {
+      if (e.target === btnInst || btnInst.contains(e.target)) return;
+      openGithubPreview(item, displayName);
+    });
+  }
 
   return card;
 }
@@ -975,29 +1037,67 @@ function openGithubPreview(item, displayName) {
   UI.textarea.focus();
 }
 
-async function importGithubSkill(content, suggestedName, btnEl) {
-  if (!FS.rootHandle) {
-    toast('Conectá un directorio primero', 'error');
-    return;
+async function openInstallModal(item, skillName) {
+  GHI.item      = item;
+  GHI.skillName = skillName;
+
+  UI.ghiSkillName.textContent = skillName;
+  UI.ghiConflict.classList.add('hidden');
+
+  try {
+    S.directories = await FS.findDirectories();
+    UI.ghiDestDir.innerHTML = '';
+    S.directories.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = d.path;
+      opt.text  = d.label;
+      UI.ghiDestDir.appendChild(opt);
+    });
+  } catch (_) {
+    UI.ghiDestDir.innerHTML = '<option value="">/ raíz</option>';
+    S.directories = [{ label: '/ raíz', path: '', handle: FS.rootHandle }];
   }
 
-  const baseName   = sanitizeName(suggestedName) || 'skill-importado';
-  const fileName   = `${baseName}.md`;
-  const destPath   = '';                  // raíz del proyecto
-  const targetHandle = FS.rootHandle;
+  _updateInstallPreview();
+  openModal('modal-gh-install');
+}
 
-  // Resolver conflicto de nombre
-  const { finalName, conflict } = _resolveImportName(fileName, destPath);
+function _updateInstallPreview() {
+  if (!GHI.item) return;
+  const destPath  = UI.ghiDestDir.value;
+  const baseName  = (sanitizeName(GHI.skillName) || 'skill') + '.md';
+  const { finalName, conflict } = _resolveImportName(baseName, destPath);
+  const fullPath  = destPath ? `${destPath}/${finalName}` : finalName;
 
-  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
+  UI.ghiPreviewPath.textContent = fullPath;
+  GHI._resolvedName = finalName;
+
+  if (conflict) {
+    UI.ghiConflict.classList.remove('hidden');
+    UI.ghiConflict.textContent = `Ya existe "${baseName}". Se instalará como "${finalName}".`;
+  } else {
+    UI.ghiConflict.classList.add('hidden');
+  }
+}
+
+async function confirmGhInstall() {
+  if (!GHI.item || !GHI.item.content) return;
+
+  const destPath     = UI.ghiDestDir.value;
+  const finalName    = GHI._resolvedName || (sanitizeName(GHI.skillName) || 'skill') + '.md';
+  const dirEntry     = S.directories.find(d => d.path === destPath);
+  const targetHandle = dirEntry ? dirEntry.handle : FS.rootHandle;
+
+  UI.btnGhiConfirm.disabled    = true;
+  UI.btnGhiConfirm.textContent = '...';
 
   try {
     const newHandle = await targetHandle.getFileHandle(finalName, { create: true });
-    await FS.writeFile(newHandle, content);
+    await FS.writeFile(newHandle, GHI.item.content);
 
-    const fileType  = await FS._detectFileType(finalName, newHandle, destPath);
-    const name      = finalName.replace(/\.md$/i, '');
-    const fullPath  = finalName;
+    const fileType = await FS._detectFileType(finalName, newHandle, destPath);
+    const name     = finalName.replace(/\.md$/i, '');
+    const fullPath = destPath ? `${destPath}/${finalName}` : finalName;
 
     const newSkill = {
       name, path: fullPath, handle: newHandle,
@@ -1006,17 +1106,20 @@ async function importGithubSkill(content, suggestedName, btnEl) {
     };
 
     S.skills.push(newSkill);
-    closeGithubPanel();
+    closeModal('modal-gh-install');
     renderList();
     await openSkill(newSkill);
 
-    const msg = conflict
-      ? `Importado como "${finalName}" (renombrado para evitar conflicto)`
-      : `"${finalName}" importado correctamente`;
-    toast(msg, 'success');
+    const baseName = (sanitizeName(GHI.skillName) || 'skill') + '.md';
+    const conflict = finalName !== baseName;
+    toast(conflict
+      ? `Instalado como "${finalName}" (renombrado)`
+      : `"${finalName}" instalado correctamente`, 'success');
   } catch (e) {
-    toast('Error al importar: ' + e.message, 'error');
-    if (btnEl) { btnEl.disabled = false; btnEl.textContent = 'Importar'; }
+    toast('Error al instalar: ' + e.message, 'error');
+  } finally {
+    UI.btnGhiConfirm.disabled    = false;
+    UI.btnGhiConfirm.textContent = 'Instalar';
   }
 }
 

@@ -107,30 +107,6 @@
         </div>
       </aside>
 
-      <!-- PANEL: GITHUB SKILLS (overlay sobre el sidebar) -->
-      <div id="github-skills-panel">
-        <div class="gsp-header">
-          <span class="gsp-title">Skills de GitHub</span>
-          <span id="gsp-count" class="gsp-count hidden">0</span>
-          <button id="btn-gsp-close" class="gsp-close" title="Cerrar">×</button>
-        </div>
-        <div class="gsp-controls">
-          <div class="gsp-token-bar">
-            <button id="btn-gsp-register-token" class="btn-ghost btn-sm">⚿ Registrar token</button>
-            <span id="gsp-token-status" class="gsp-token-status no-token">Sin token</span>
-            <span id="gsp-rate-badge" class="gsp-rate-badge">—</span>
-          </div>
-          <div class="gsp-search-bar">
-            <input id="gsp-search-input" type="text" class="gsp-search-input"
-                   placeholder="Nombre del skill..." autocomplete="off"/>
-            <button id="btn-gsp-search" class="btn-primary gsp-btn-search" disabled>Buscar</button>
-          </div>
-        </div>
-        <div id="gsp-body" class="gsp-body">
-          <div class="gsp-empty">Registrá un token y buscá skills por nombre.</div>
-        </div>
-      </div>
-
       <div id="sidebar-resizer" class="panel-resizer"></div>
 
       <main id="content-area">
@@ -187,6 +163,43 @@
         </div>
       </main>
     </div>
+
+    <!-- PANEL: GITHUB SKILLS — fuera de #main-layout para evitar clipping por overflow:hidden -->
+    <div id="github-skills-panel">
+      <div class="gsp-header">
+        <span class="gsp-title">Skills de GitHub</span>
+        <span id="gsp-count" class="gsp-count hidden">0</span>
+        <button id="btn-gsp-close" class="gsp-close" title="Cerrar">×</button>
+      </div>
+      <div class="gsp-controls">
+        <div class="gsp-token-bar">
+          <button id="btn-gsp-register-token" class="btn-ghost btn-sm">⚿ Registrar token</button>
+          <span id="gsp-token-status" class="gsp-token-status no-token">Sin token</span>
+          <span id="gsp-rate-badge" class="gsp-rate-badge">—</span>
+        </div>
+        <div class="gsp-search-bar">
+          <input id="gsp-search-input" type="text" class="gsp-search-input"
+                 placeholder="Nombre del skill..." autocomplete="off"/>
+          <button id="btn-gsp-search" class="btn-primary gsp-btn-search" disabled>Buscar</button>
+        </div>
+      </div>
+      <div id="gsp-pagination" class="gsp-pagination hidden">
+        <span id="gsp-page-info" class="gsp-pager-info">—</span>
+        <div class="gsp-pager-controls">
+          <button id="btn-gsp-prev" class="btn-ghost btn-sm" disabled>‹</button>
+          <select id="gsp-per-page" class="gsp-per-page">
+            <option value="10">10 / pág</option>
+            <option value="20">20 / pág</option>
+            <option value="30">30 / pág</option>
+          </select>
+          <button id="btn-gsp-next" class="btn-ghost btn-sm" disabled>›</button>
+        </div>
+      </div>
+      <div id="gsp-body" class="gsp-body">
+        <div class="gsp-empty">Registrá un token y buscá skills por nombre.</div>
+      </div>
+    </div>
+
   </div>
 
   <!-- MODAL: NUEVO ARCHIVO -->
@@ -291,6 +304,31 @@
       <div class="modal-footer">
         <button class="btn-ghost" data-modal="modal-import">Cancelar</button>
         <button id="btn-confirm-import" class="btn-primary" disabled>Importar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: INSTALAR SKILL DE GITHUB -->
+  <div id="modal-gh-install" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="modal-title">Instalar skill</span>
+        <button class="modal-close" data-modal="modal-gh-install">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-text">Instalar <strong id="ghi-skill-name"></strong></p>
+        <label class="field-label" style="margin-top:12px">Directorio destino</label>
+        <select id="ghi-dest-dir" class="field-input field-select">
+          <option value="">/ raíz</option>
+        </select>
+        <p class="field-hint">Se instalará como: <code id="ghi-preview-path">—</code></p>
+        <p id="ghi-conflict-notice" class="import-conflict-notice hidden">
+          Ya existe un archivo con ese nombre. Se renombrará automáticamente.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-ghost" data-modal="modal-gh-install">Cancelar</button>
+        <button id="btn-ghi-confirm" class="btn-primary">Instalar</button>
       </div>
     </div>
   </div>
