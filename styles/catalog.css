@@ -206,3 +206,26 @@
   border-color: transparent;
   font-weight: 500;
 }
+
+/* Repo tag (source org) */
+.c-tag.repo-tag {
+  font-family: var(--mono);
+  font-size: 9px;
+  background: var(--subtle);
+  color: var(--text-3);
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Score badge as repo identifier */
+.score-badge.repo-badge {
+  font-size: 10px;
+  font-family: var(--mono);
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
