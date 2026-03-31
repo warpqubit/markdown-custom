@@ -25,12 +25,17 @@ async function _apiFetch(url, token = '') {
 }
 
 /**
- * Busca archivos SKILL.md en repos públicos de GitHub.
+ * Busca archivos SKILL.md en repos públicos de GitHub filtrando por query.
+ * @param {string} query   Término de búsqueda (nombre del skill)
+ * @param {string} token   Token de autenticación
  * @returns {Promise<Array<{repo, fullName, path, stars, forks, updatedAt}>>}
  */
-export async function searchSkillFiles(token = '') {
+export async function searchSkillFiles(query = '', token = '') {
+  const term = query.trim()
+    ? `${query.trim()} filename:SKILL.md`
+    : 'filename:SKILL.md';
   const data = await _apiFetch(
-    `${BASE}/search/code?q=SKILL.md+in:path&per_page=30`,
+    `${BASE}/search/code?q=${encodeURIComponent(term)}&per_page=20`,
     token
   );
   return (data.items || []).map(item => ({

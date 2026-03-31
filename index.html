@@ -114,19 +114,20 @@
           <span id="gsp-count" class="gsp-count hidden">0</span>
           <button id="btn-gsp-close" class="gsp-close" title="Cerrar">×</button>
         </div>
-        <div class="gsp-token-row">
-          <div class="gsp-token-wrap">
-            <span id="gsp-token-dot" class="gsp-token-dot" title="Sin token: 60 req/hora"></span>
-            <input id="gsp-token" type="password" class="gsp-token-input"
-                   placeholder="ghp_... (opcional)" autocomplete="off"/>
+        <div class="gsp-controls">
+          <div class="gsp-token-bar">
+            <button id="btn-gsp-register-token" class="btn-ghost btn-sm">⚿ Registrar token</button>
+            <span id="gsp-token-status" class="gsp-token-status no-token">Sin token</span>
+            <span id="gsp-rate-badge" class="gsp-rate-badge">—</span>
           </div>
-          <span id="gsp-rate-badge" class="gsp-rate-badge" title="Requests disponibles">—</span>
-        </div>
-        <div class="gsp-search-row">
-          <button id="btn-gsp-search" class="btn-primary gsp-btn-search">Buscar skills</button>
+          <div class="gsp-search-bar">
+            <input id="gsp-search-input" type="text" class="gsp-search-input"
+                   placeholder="Nombre del skill..." autocomplete="off"/>
+            <button id="btn-gsp-search" class="btn-primary gsp-btn-search" disabled>Buscar</button>
+          </div>
         </div>
         <div id="gsp-body" class="gsp-body">
-          <div class="gsp-empty">Presioná "Buscar skills" para descubrir SKILL.md en GitHub.</div>
+          <div class="gsp-empty">Registrá un token y buscá skills por nombre.</div>
         </div>
       </div>
 
@@ -290,6 +291,31 @@
       <div class="modal-footer">
         <button class="btn-ghost" data-modal="modal-import">Cancelar</button>
         <button id="btn-confirm-import" class="btn-primary" disabled>Importar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: REGISTRAR TOKEN DE GITHUB -->
+  <div id="modal-github-token" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-head">
+        <span class="modal-title">Registrar token de GitHub</span>
+        <button class="modal-close" data-modal="modal-github-token">×</button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label">Personal Access Token</label>
+        <input id="gsp-token-input" type="password" class="field-input"
+               placeholder="ghp_xxxxxxxxxxxx" autocomplete="off"/>
+        <p class="field-hint">
+          Generá un token en <code>github.com → Settings → Developer settings → Personal access tokens</code>.
+          Solo necesitás el scope <code>public_repo</code> (lectura).<br/>
+          Sin token: 60 req/hora · Con token: 5.000 req/hora.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-gsp-token-clear" class="btn-danger-ghost">Limpiar token</button>
+        <button class="btn-ghost" data-modal="modal-github-token">Cancelar</button>
+        <button id="btn-gsp-token-accept" class="btn-primary">Registrar</button>
       </div>
     </div>
   </div>

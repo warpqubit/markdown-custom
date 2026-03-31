@@ -72,15 +72,21 @@ const UI = {
   btnConfirmImport:   el('btn-confirm-import'),
   compatWarning:      el('compat-warning'),
   // GitHub Skills panel
-  btnGithubSkills:    el('btn-github-skills'),
-  githubPanel:        el('github-skills-panel'),
-  btnGspClose:        el('btn-gsp-close'),
-  btnGspSearch:       el('btn-gsp-search'),
-  gspToken:           el('gsp-token'),
-  gspTokenDot:        el('gsp-token-dot'),
-  gspRateBadge:       el('gsp-rate-badge'),
-  gspCount:           el('gsp-count'),
-  gspBody:            el('gsp-body'),
+  btnGithubSkills:      el('btn-github-skills'),
+  githubPanel:          el('github-skills-panel'),
+  btnGspClose:          el('btn-gsp-close'),
+  btnGspSearch:         el('btn-gsp-search'),
+  gspSearchInput:       el('gsp-search-input'),
+  gspRateBadge:         el('gsp-rate-badge'),
+  gspCount:             el('gsp-count'),
+  gspBody:              el('gsp-body'),
+  btnGspRegisterToken:  el('btn-gsp-register-token'),
+  gspTokenStatus:       el('gsp-token-status'),
+  // Modal token
+  modalGithubToken:     el('modal-github-token'),
+  gspTokenInput:        el('gsp-token-input'),
+  btnGspTokenAccept:    el('btn-gsp-token-accept'),
+  btnGspTokenClear:     el('btn-gsp-token-clear'),
 };
 
 // =============================================
@@ -240,13 +246,14 @@ function bindEvents() {
   });
 
   // GitHub Skills panel
-  UI.btnGithubSkills.addEventListener('click', openGithubPanel);
-  UI.btnGspClose.addEventListener('click',     closeGithubPanel);
-  UI.btnGspSearch.addEventListener('click',    runGithubSearch);
-  UI.gspToken.addEventListener('input', () => {
-    S.githubToken = UI.gspToken.value.trim();
-    localStorage.setItem('mc_github_token', S.githubToken);
-    _syncTokenDot();
+  UI.btnGithubSkills.addEventListener('click',        openGithubPanel);
+  UI.btnGspClose.addEventListener('click',            closeGithubPanel);
+  UI.btnGspSearch.addEventListener('click',           runGithubSearch);
+  UI.btnGspRegisterToken.addEventListener('click',    openTokenModal);
+  UI.btnGspTokenAccept.addEventListener('click',      acceptToken);
+  UI.btnGspTokenClear.addEventListener('click',       clearToken);
+  UI.gspSearchInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !UI.btnGspSearch.disabled) runGithubSearch();
   });
 
   UI.btnUnsavedDiscard.addEventListener('click', () => {
@@ -492,6 +499,11 @@ function updateFilesize(content) {
 async function save() {
   if (!S.active) return;
 
+  if (S.active._githubPreview) {
+    toast('Skill de GitHub — usá el panel de GitHub para importarlo a tu proyecto.', 'info');
+    return;
+  }
+
   if (S.active.virtual) {
     try {
       const { handle, dirHandle } = await FS.materializeSkill(
@@ -699,23 +711,47 @@ async function confirmDelete() {
 // =============================================
 // GITHUB SKILLS PANEL
 // =============================================
-function _syncTokenDot() {
+
+function _syncTokenStatus() {
   const has = S.githubToken.length > 0;
-  UI.gspTokenDot.className = `gsp-token-dot ${has ? 'has-token' : 'no-token'}`;
-  UI.gspTokenDot.title     = has
-    ? 'Token activo: 5.000 req/hora'
-    : 'Sin token: 60 req/hora';
+  UI.gspTokenStatus.textContent = has ? '● Token registrado' : '○ Sin token';
+  UI.gspTokenStatus.className   = `gsp-token-status ${has ? 'has-token' : 'no-token'}`;
+  UI.btnGspSearch.disabled      = !has;
 }
 
-function openGithubPanel() {
-  // Restaurar token guardado
-  const saved = localStorage.getItem('mc_github_token') || '';
-  S.githubToken      = saved;
-  UI.gspToken.value  = saved;
-  _syncTokenDot();
+// — Token modal —
+function openTokenModal() {
+  UI.gspTokenInput.value = S.githubToken;
+  openModal('modal-github-token');
+  UI.gspTokenInput.focus();
+}
 
+function acceptToken() {
+  const val = UI.gspTokenInput.value.trim();
+  S.githubToken = val;
+  localStorage.setItem('mc_github_token', val);
+  _syncTokenStatus();
+  closeModal('modal-github-token');
+  toast(val ? 'Token registrado' : 'Token eliminado', 'success');
+}
+
+function clearToken() {
+  UI.gspTokenInput.value = '';
+  S.githubToken = '';
+  localStorage.removeItem('mc_github_token');
+  _syncTokenStatus();
+  closeModal('modal-github-token');
+  toast('Token eliminado', 'info');
+}
+
+// — Panel open/close —
+function openGithubPanel() {
+  const saved = localStorage.getItem('mc_github_token') || '';
+  S.githubToken = saved;
+  _syncTokenStatus();
   S.githubPanelOpen = true;
   UI.githubPanel.classList.add('open');
+  UI.gspSearchInput.focus();
 }
 
 function closeGithubPanel() {
@@ -723,27 +759,30 @@ function closeGithubPanel() {
   UI.githubPanel.classList.remove('open');
 }
 
+// — Búsqueda —
 async function runGithubSearch() {
+  const query = UI.gspSearchInput.value.trim();
+  if (!query) { UI.gspSearchInput.focus(); return; }
+
   UI.btnGspSearch.disabled    = true;
-  UI.btnGspSearch.textContent = 'Buscando...';
+  UI.btnGspSearch.textContent = '...';
   UI.gspCount.classList.add('hidden');
 
-  // Mostrar spinner
-  const spinner = document.createElement('div');
-  spinner.className = 'gsp-loading';
-  const sp = document.createElement('div');
-  sp.className = 'gsp-spinner';
-  spinner.appendChild(sp);
-  const loadTxt = document.createTextNode('Buscando SKILL.md en GitHub...');
-  spinner.appendChild(loadTxt);
+  // Spinner
   UI.gspBody.innerHTML = '';
-  UI.gspBody.appendChild(spinner);
+  const wrap = document.createElement('div');
+  wrap.className = 'gsp-loading';
+  const sp  = document.createElement('div');
+  sp.className = 'gsp-spinner';
+  wrap.appendChild(sp);
+  wrap.appendChild(document.createTextNode(`Buscando "${query}"...`));
+  UI.gspBody.appendChild(wrap);
 
   try {
-    // 1. Buscar archivos SKILL.md
-    const results = await searchSkillFiles(S.githubToken);
+    // 1. Buscar
+    const results = await searchSkillFiles(query, S.githubToken);
 
-    // 2. Para cada resultado, obtener contenido + métricas
+    // 2. Enriquecer con contenido + métricas
     const enriched = [];
     for (const item of results) {
       try {
@@ -751,19 +790,17 @@ async function runGithubSearch() {
         const metrics = parseSkillMetrics(content);
         enriched.push({ ...item, content, metrics });
       } catch (_) {
-        // Si falla la obtención de contenido, igual incluir el card sin preview
-        enriched.push({ ...item, content: null, metrics: { name: '', description: '', wordCount: 0, hasExamples: false, hasTriggers: false } });
+        enriched.push({ ...item, content: null,
+          metrics: { name: '', description: '', wordCount: 0, hasExamples: false, hasTriggers: false } });
       }
     }
 
     S.githubSkills = enriched;
-
-    // 3. Render
     _renderGithubSkills(enriched);
 
-    // 4. Actualizar rate limit
+    // 3. Rate limit
     try {
-      const rl = await getRateLimit(S.githubToken);
+      const rl  = await getRateLimit(S.githubToken);
       const low = rl.remaining < 10;
       UI.gspRateBadge.textContent = `${rl.remaining}/${rl.limit}`;
       UI.gspRateBadge.className   = `gsp-rate-badge${low ? ' low' : ''}`;
@@ -777,7 +814,7 @@ async function runGithubSearch() {
     UI.gspBody.appendChild(errDiv);
   } finally {
     UI.btnGspSearch.disabled    = false;
-    UI.btnGspSearch.textContent = 'Buscar skills';
+    UI.btnGspSearch.textContent = 'Buscar';
   }
 }
 
@@ -787,7 +824,7 @@ function _renderGithubSkills(items) {
   if (!items.length) {
     const empty = document.createElement('div');
     empty.className   = 'gsp-empty';
-    empty.textContent = 'No se encontraron resultados.';
+    empty.textContent = 'Sin resultados. Probá otro término.';
     UI.gspBody.appendChild(empty);
     return;
   }
@@ -795,37 +832,41 @@ function _renderGithubSkills(items) {
   UI.gspCount.textContent = items.length;
   UI.gspCount.classList.remove('hidden');
 
-  items.forEach(item => {
-    const card = _buildGithubCard(item);
-    UI.gspBody.appendChild(card);
-  });
+  items.forEach(item => UI.gspBody.appendChild(_buildGithubCard(item)));
 }
 
 function _buildGithubCard(item) {
-  const hasDir    = !!FS.rootHandle;
-  const m         = item.metrics;
-  const displayName = m.name || item.repo.split('/')[1] || item.repo;
-  const dateStr   = item.updatedAt
-    ? new Date(item.updatedAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: '2-digit' })
+  const hasDir      = !!FS.rootHandle;
+  const m           = item.metrics;
+  const displayName = m.name || item.path.split('/').slice(-2, -1)[0] || item.repo;
+  const dateStr     = item.updatedAt
+    ? new Date(item.updatedAt).toLocaleDateString('es-AR',
+        { day: '2-digit', month: 'short', year: '2-digit' })
     : '—';
 
   const card = document.createElement('div');
   card.className = 'gsp-card';
 
-  // — Top —
+  // — Zona clicable (abre en editor) —
   const top = document.createElement('div');
   top.className = 'gsp-card-top';
+  top.title     = 'Clic para ver en el editor';
 
-  const repo = document.createElement('div');
-  repo.className   = 'gsp-card-repo';
-  repo.textContent = item.repo;
+  const nameEl = document.createElement('div');
+  nameEl.className   = 'gsp-card-name';
+  nameEl.textContent = displayName;
 
-  const path = document.createElement('div');
-  path.className   = 'gsp-card-path';
-  path.textContent = item.path;
+  const repoEl = document.createElement('div');
+  repoEl.className   = 'gsp-card-repo';
+  repoEl.textContent = item.repo;
 
-  top.appendChild(repo);
-  top.appendChild(path);
+  const pathEl = document.createElement('div');
+  pathEl.className   = 'gsp-card-path';
+  pathEl.textContent = item.path;
+
+  top.appendChild(nameEl);
+  top.appendChild(repoEl);
+  top.appendChild(pathEl);
 
   if (m.description) {
     const desc = document.createElement('div');
@@ -834,84 +875,104 @@ function _buildGithubCard(item) {
     top.appendChild(desc);
   }
 
-  // — Metrics —
-  const metrics = document.createElement('div');
-  metrics.className = 'gsp-card-metrics';
-
-  const addMetric = (text, good = false) => {
+  // Métricas
+  const metricsEl = document.createElement('div');
+  metricsEl.className = 'gsp-card-metrics';
+  const addM = (text) => {
     const s = document.createElement('span');
-    s.className   = `gsp-metric${good ? ' good' : ''}`;
-    s.textContent = text;
-    metrics.appendChild(s);
+    s.className = 'gsp-metric'; s.textContent = text;
+    metricsEl.appendChild(s);
   };
-  addMetric(`⭐ ${item.stars.toLocaleString()}`);
-  addMetric(`🍴 ${item.forks.toLocaleString()}`);
-  addMetric(`📅 ${dateStr}`);
-  if (m.wordCount > 0) addMetric(`${m.wordCount} palabras`);
-  top.appendChild(metrics);
+  addM(`⭐ ${item.stars.toLocaleString()}`);
+  addM(`🍴 ${item.forks.toLocaleString()}`);
+  addM(`📅 ${dateStr}`);
+  top.appendChild(metricsEl);
 
-  // — Tags —
+  // Tags
   if (m.hasExamples || m.hasTriggers) {
-    const tags = document.createElement('div');
-    tags.className = 'gsp-card-tags';
-    if (m.hasTriggers) {
-      const t = document.createElement('span');
-      t.className = 'gsp-tag'; t.textContent = 'triggers'; tags.appendChild(t);
-    }
-    if (m.hasExamples) {
-      const t = document.createElement('span');
-      t.className = 'gsp-tag'; t.textContent = 'ejemplos'; tags.appendChild(t);
-    }
-    top.appendChild(tags);
+    const tagsEl = document.createElement('div');
+    tagsEl.className = 'gsp-card-tags';
+    if (m.hasTriggers) { const t = document.createElement('span'); t.className = 'gsp-tag'; t.textContent = 'triggers'; tagsEl.appendChild(t); }
+    if (m.hasExamples) { const t = document.createElement('span'); t.className = 'gsp-tag'; t.textContent = 'ejemplos'; tagsEl.appendChild(t); }
+    top.appendChild(tagsEl);
+  }
+
+  // Click en la card → abre en editor y cierra panel
+  if (item.content) {
+    top.addEventListener('click', () => {
+      openGithubPreview(item, displayName);
+      closeGithubPanel();
+    });
+  } else {
+    top.style.opacity = '.6';
+    top.style.cursor  = 'default';
   }
 
   card.appendChild(top);
 
-  // — Preview inline (oculto por defecto) —
-  const preview = document.createElement('div');
-  preview.className = 'gsp-card-preview hidden';
-  if (item.content) {
-    const pre = document.createElement('pre');
-    pre.textContent = item.content;
-    preview.appendChild(pre);
-  } else {
-    const na = document.createTextNode('Contenido no disponible.');
-    preview.appendChild(na);
-  }
-  card.appendChild(preview);
-
-  // — Actions —
+  // — Acción importar —
   const actions = document.createElement('div');
   actions.className = 'gsp-card-actions';
 
-  const btnView = document.createElement('button');
-  btnView.className   = 'gsp-btn-view';
-  btnView.textContent = 'Ver contenido';
-  btnView.addEventListener('click', () => {
-    const open = preview.classList.toggle('hidden');
-    btnView.textContent = open ? 'Ver contenido' : 'Ocultar';
-    btnView.classList.toggle('active', !open);
-  });
+  const hint = document.createElement('span');
+  hint.className   = 'gsp-card-hint';
+  hint.textContent = item.content ? 'Clic para abrir en editor' : 'Sin contenido disponible';
+  actions.appendChild(hint);
 
   const btnImp = document.createElement('button');
   btnImp.className   = 'gsp-btn-import';
   btnImp.textContent = 'Importar';
-  btnImp.disabled    = !hasDir;
-  if (!hasDir) btnImp.title = 'Conectá un directorio primero';
-  if (item.content) {
-    btnImp.addEventListener('click', () =>
-      importGithubSkill(item.content, displayName, btnImp)
-    );
-  } else {
-    btnImp.disabled = true;
-    btnImp.title    = 'Contenido no disponible';
+  btnImp.disabled    = !hasDir || !item.content;
+  if (!hasDir)       btnImp.title = 'Conectá un directorio primero';
+  if (!item.content) btnImp.title = 'Contenido no disponible';
+  if (hasDir && item.content) {
+    btnImp.addEventListener('click', e => {
+      e.stopPropagation();
+      importGithubSkill(item.content, displayName, btnImp);
+    });
   }
-
-  actions.appendChild(btnView);
   actions.appendChild(btnImp);
   card.appendChild(actions);
 
   return card;
+}
+
+// Abre un skill de GitHub en el editor (modo preview, solo lectura inicial)
+function openGithubPreview(item, displayName) {
+  const content = item.content || '';
+
+  S.active       = {
+    name:           displayName,
+    path:           `github/${item.repo}/${item.path}`,
+    handle:         null,
+    dirHandle:      null,
+    dir:            `github/${item.repo}`,
+    virtual:        false,
+    fileType:       'skill',
+    _githubPreview: true,
+  };
+  S.savedContent = content;
+  S.draftContent = content;
+
+  UI.emptyState.classList.add('hidden');
+  UI.editorPanel.classList.remove('hidden');
+  UI.editorName.textContent      = displayName;
+  UI.editorFileLabel.textContent = item.path.split('/').pop();
+  UI.textarea.value              = content;
+  updatePreview(content);
+  setStatus('saved');
+  updateLineCol();
+  updateFilesize(content);
+
+  UI.editorBadge.textContent = 'github';
+  UI.editorBadge.className   = 'skill-badge type-skill';
+  UI.editorBadge.classList.remove('hidden');
+  UI.statusPath.textContent = `github/${item.repo}/${item.path}`;
+
+  // No agregar a S.skills — es solo preview
+  // Si había un skill activo seleccionado, limpiar su .active en el sidebar
+  renderList(UI.skillSearch.value);
+  UI.textarea.focus();
 }
 
 async function importGithubSkill(content, suggestedName, btnEl) {

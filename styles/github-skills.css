@@ -60,48 +60,29 @@
 }
 .gsp-close:hover { color: var(--text); }
 
-/* TOKEN ROW */
-.gsp-token-row {
-  padding: 8px 10px 6px;
+/* CONTROLS BLOCK */
+.gsp-controls {
+  padding: 8px 10px;
   border-bottom: 0.5px solid var(--border);
   flex-shrink: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 7px;
 }
-.gsp-token-wrap {
-  flex: 1;
+
+.gsp-token-bar {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: var(--subtle);
-  border: 0.5px solid var(--border-md);
-  border-radius: var(--r-md);
-  padding: 5px 9px;
-  min-width: 0;
 }
-.gsp-token-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--text-3);   /* gris = sin token */
-  transition: background .2s;
-}
-.gsp-token-dot.has-token  { background: var(--success); }
-.gsp-token-dot.no-token   { background: var(--warning); }
-
-.gsp-token-input {
+.gsp-token-status {
   flex: 1;
-  border: none;
-  background: transparent;
-  font-size: 11px;
+  font-size: 10px;
   font-family: var(--mono);
-  color: var(--text);
-  outline: none;
-  min-width: 0;
+  font-weight: 600;
 }
-.gsp-token-input::placeholder { color: var(--text-3); }
+.gsp-token-status.has-token { color: var(--success); }
+.gsp-token-status.no-token  { color: var(--warning); }
 
 .gsp-rate-badge {
   font-size: 10px;
@@ -112,19 +93,32 @@
 }
 .gsp-rate-badge.low { color: var(--danger); font-weight: 600; }
 
-/* SEARCH ROW */
-.gsp-search-row {
-  padding: 8px 10px;
-  border-bottom: 0.5px solid var(--border);
+.gsp-search-bar {
+  display: flex;
+  gap: 6px;
+}
+.gsp-search-input {
+  flex: 1;
+  padding: 6px 9px;
+  border: 0.5px solid var(--border-md);
+  border-radius: var(--r-md);
+  background: var(--subtle);
+  font-size: 12px;
+  font-family: var(--font);
+  color: var(--text);
+  outline: none;
+  transition: border-color .15s;
+}
+.gsp-search-input:focus { border-color: var(--primary-mid); background: var(--surface); }
+.gsp-search-input::placeholder { color: var(--text-3); }
+
+.gsp-btn-search {
+  padding: 6px 12px;
+  font-size: 12px;
+  white-space: nowrap;
   flex-shrink: 0;
 }
-.gsp-btn-search {
-  width: 100%;
-  padding: 7px 12px;
-  font-size: 12px;
-  justify-content: center;
-}
-.gsp-btn-search:disabled { opacity: .45; cursor: default; }
+.gsp-btn-search:disabled { opacity: .4; cursor: not-allowed; }
 
 /* BODY — lista scrolleable */
 .gsp-body {
@@ -177,34 +171,47 @@
   border-radius: var(--r-md);
   background: var(--subtle);
   overflow: hidden;
-  transition: border-color .12s;
+  transition: border-color .12s, box-shadow .12s;
 }
-.gsp-card:hover { border-color: var(--border-md); }
+.gsp-card:hover { border-color: var(--primary-mid); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
 
 .gsp-card-top {
-  padding: 9px 11px 7px;
+  padding: 10px 12px 8px;
+  cursor: pointer;
+  transition: background .1s;
 }
-.gsp-card-repo {
-  font-size: 12px;
+.gsp-card-top:hover { background: var(--hover); }
+
+.gsp-card-name {
+  font-size: 13px;
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-bottom: 2px;
 }
-.gsp-card-path {
+.gsp-card-repo {
   font-size: 10px;
   font-family: var(--mono);
-  color: var(--text-3);
-  margin-top: 2px;
+  color: var(--primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.gsp-card-path {
+  font-size: 9px;
+  font-family: var(--mono);
+  color: var(--text-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
 .gsp-card-desc {
   font-size: 11px;
   color: var(--text-2);
-  margin-top: 4px;
+  margin-top: 5px;
   line-height: 1.45;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -242,26 +249,15 @@
 /* ACTIONS */
 .gsp-card-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
-  padding: 0 11px 9px;
+  padding: 0 12px 9px;
 }
-.gsp-btn-view {
+.gsp-card-hint {
   flex: 1;
-  padding: 4px 8px;
-  background: var(--surface);
-  border: 0.5px solid var(--border-md);
-  border-radius: var(--r-md);
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-2);
-  cursor: pointer;
-  transition: background .12s, color .12s;
-}
-.gsp-btn-view:hover { background: var(--hover); color: var(--text); }
-.gsp-btn-view.active {
-  background: var(--primary-light);
-  color: var(--primary);
-  border-color: var(--primary);
+  font-size: 9px;
+  color: var(--text-3);
+  font-style: italic;
 }
 
 .gsp-btn-import {
