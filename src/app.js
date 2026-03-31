@@ -1,14 +1,18 @@
-// app.js — Orquestador principal — Markdown Custom v1.2
+// app.js — Orquestador principal — Markdown Custom v1.3
 import { FS } from './fs.js';
+import { searchSkillFiles, fetchSkillContent, parseSkillMetrics, getRateLimit } from './githubSkills.js';
 
 // ---- ESTADO ----
 const S = {
-  skills:        [],
-  active:        null,   // { name, path, handle, dirHandle, dir, virtual, fileType, targetDirHandle? }
-  savedContent:  '',
-  draftContent:  '',
-  pendingSkill:  null,   // skill al que el usuario quiere navegar sin guardar
-  directories:   [],     // [{ label, path, handle }] — para el modal de nuevo archivo
+  skills:           [],
+  active:           null,   // { name, path, handle, dirHandle, dir, virtual, fileType, targetDirHandle? }
+  savedContent:     '',
+  draftContent:     '',
+  pendingSkill:     null,   // skill al que el usuario quiere navegar sin guardar
+  directories:      [],     // [{ label, path, handle }] — para el modal de nuevo archivo
+  githubToken:      '',
+  githubSkills:     [],     // resultados de la última búsqueda
+  githubPanelOpen:  false,
 };
 
 // ---- DOM ----
@@ -67,6 +71,16 @@ const UI = {
   importConflict:     el('import-conflict-notice'),
   btnConfirmImport:   el('btn-confirm-import'),
   compatWarning:      el('compat-warning'),
+  // GitHub Skills panel
+  btnGithubSkills:    el('btn-github-skills'),
+  githubPanel:        el('github-skills-panel'),
+  btnGspClose:        el('btn-gsp-close'),
+  btnGspSearch:       el('btn-gsp-search'),
+  gspToken:           el('gsp-token'),
+  gspTokenDot:        el('gsp-token-dot'),
+  gspRateBadge:       el('gsp-rate-badge'),
+  gspCount:           el('gsp-count'),
+  gspBody:            el('gsp-body'),
 };
 
 // =============================================
@@ -221,7 +235,18 @@ function bindEvents() {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); save(); }
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal-overlay:not(.hidden)').forEach(o => closeModal(o.id));
+      if (S.githubPanelOpen) closeGithubPanel();
     }
+  });
+
+  // GitHub Skills panel
+  UI.btnGithubSkills.addEventListener('click', openGithubPanel);
+  UI.btnGspClose.addEventListener('click',     closeGithubPanel);
+  UI.btnGspSearch.addEventListener('click',    runGithubSearch);
+  UI.gspToken.addEventListener('input', () => {
+    S.githubToken = UI.gspToken.value.trim();
+    localStorage.setItem('mc_github_token', S.githubToken);
+    _syncTokenDot();
   });
 
   UI.btnUnsavedDiscard.addEventListener('click', () => {
@@ -668,6 +693,269 @@ async function confirmDelete() {
   } catch (e) {
     toast('Error al eliminar: ' + e.message, 'error');
     closeModal('modal-delete');
+  }
+}
+
+// =============================================
+// GITHUB SKILLS PANEL
+// =============================================
+function _syncTokenDot() {
+  const has = S.githubToken.length > 0;
+  UI.gspTokenDot.className = `gsp-token-dot ${has ? 'has-token' : 'no-token'}`;
+  UI.gspTokenDot.title     = has
+    ? 'Token activo: 5.000 req/hora'
+    : 'Sin token: 60 req/hora';
+}
+
+function openGithubPanel() {
+  // Restaurar token guardado
+  const saved = localStorage.getItem('mc_github_token') || '';
+  S.githubToken      = saved;
+  UI.gspToken.value  = saved;
+  _syncTokenDot();
+
+  S.githubPanelOpen = true;
+  UI.githubPanel.classList.add('open');
+}
+
+function closeGithubPanel() {
+  S.githubPanelOpen = false;
+  UI.githubPanel.classList.remove('open');
+}
+
+async function runGithubSearch() {
+  UI.btnGspSearch.disabled    = true;
+  UI.btnGspSearch.textContent = 'Buscando...';
+  UI.gspCount.classList.add('hidden');
+
+  // Mostrar spinner
+  const spinner = document.createElement('div');
+  spinner.className = 'gsp-loading';
+  const sp = document.createElement('div');
+  sp.className = 'gsp-spinner';
+  spinner.appendChild(sp);
+  const loadTxt = document.createTextNode('Buscando SKILL.md en GitHub...');
+  spinner.appendChild(loadTxt);
+  UI.gspBody.innerHTML = '';
+  UI.gspBody.appendChild(spinner);
+
+  try {
+    // 1. Buscar archivos SKILL.md
+    const results = await searchSkillFiles(S.githubToken);
+
+    // 2. Para cada resultado, obtener contenido + métricas
+    const enriched = [];
+    for (const item of results) {
+      try {
+        const content = await fetchSkillContent(item.fullName, item.path, S.githubToken);
+        const metrics = parseSkillMetrics(content);
+        enriched.push({ ...item, content, metrics });
+      } catch (_) {
+        // Si falla la obtención de contenido, igual incluir el card sin preview
+        enriched.push({ ...item, content: null, metrics: { name: '', description: '', wordCount: 0, hasExamples: false, hasTriggers: false } });
+      }
+    }
+
+    S.githubSkills = enriched;
+
+    // 3. Render
+    _renderGithubSkills(enriched);
+
+    // 4. Actualizar rate limit
+    try {
+      const rl = await getRateLimit(S.githubToken);
+      const low = rl.remaining < 10;
+      UI.gspRateBadge.textContent = `${rl.remaining}/${rl.limit}`;
+      UI.gspRateBadge.className   = `gsp-rate-badge${low ? ' low' : ''}`;
+    } catch (_) { /* ignorar */ }
+
+  } catch (err) {
+    UI.gspBody.innerHTML = '';
+    const errDiv = document.createElement('div');
+    errDiv.className   = 'gsp-error';
+    errDiv.textContent = err.message;
+    UI.gspBody.appendChild(errDiv);
+  } finally {
+    UI.btnGspSearch.disabled    = false;
+    UI.btnGspSearch.textContent = 'Buscar skills';
+  }
+}
+
+function _renderGithubSkills(items) {
+  UI.gspBody.innerHTML = '';
+
+  if (!items.length) {
+    const empty = document.createElement('div');
+    empty.className   = 'gsp-empty';
+    empty.textContent = 'No se encontraron resultados.';
+    UI.gspBody.appendChild(empty);
+    return;
+  }
+
+  UI.gspCount.textContent = items.length;
+  UI.gspCount.classList.remove('hidden');
+
+  items.forEach(item => {
+    const card = _buildGithubCard(item);
+    UI.gspBody.appendChild(card);
+  });
+}
+
+function _buildGithubCard(item) {
+  const hasDir    = !!FS.rootHandle;
+  const m         = item.metrics;
+  const displayName = m.name || item.repo.split('/')[1] || item.repo;
+  const dateStr   = item.updatedAt
+    ? new Date(item.updatedAt).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: '2-digit' })
+    : '—';
+
+  const card = document.createElement('div');
+  card.className = 'gsp-card';
+
+  // — Top —
+  const top = document.createElement('div');
+  top.className = 'gsp-card-top';
+
+  const repo = document.createElement('div');
+  repo.className   = 'gsp-card-repo';
+  repo.textContent = item.repo;
+
+  const path = document.createElement('div');
+  path.className   = 'gsp-card-path';
+  path.textContent = item.path;
+
+  top.appendChild(repo);
+  top.appendChild(path);
+
+  if (m.description) {
+    const desc = document.createElement('div');
+    desc.className   = 'gsp-card-desc';
+    desc.textContent = m.description;
+    top.appendChild(desc);
+  }
+
+  // — Metrics —
+  const metrics = document.createElement('div');
+  metrics.className = 'gsp-card-metrics';
+
+  const addMetric = (text, good = false) => {
+    const s = document.createElement('span');
+    s.className   = `gsp-metric${good ? ' good' : ''}`;
+    s.textContent = text;
+    metrics.appendChild(s);
+  };
+  addMetric(`⭐ ${item.stars.toLocaleString()}`);
+  addMetric(`🍴 ${item.forks.toLocaleString()}`);
+  addMetric(`📅 ${dateStr}`);
+  if (m.wordCount > 0) addMetric(`${m.wordCount} palabras`);
+  top.appendChild(metrics);
+
+  // — Tags —
+  if (m.hasExamples || m.hasTriggers) {
+    const tags = document.createElement('div');
+    tags.className = 'gsp-card-tags';
+    if (m.hasTriggers) {
+      const t = document.createElement('span');
+      t.className = 'gsp-tag'; t.textContent = 'triggers'; tags.appendChild(t);
+    }
+    if (m.hasExamples) {
+      const t = document.createElement('span');
+      t.className = 'gsp-tag'; t.textContent = 'ejemplos'; tags.appendChild(t);
+    }
+    top.appendChild(tags);
+  }
+
+  card.appendChild(top);
+
+  // — Preview inline (oculto por defecto) —
+  const preview = document.createElement('div');
+  preview.className = 'gsp-card-preview hidden';
+  if (item.content) {
+    const pre = document.createElement('pre');
+    pre.textContent = item.content;
+    preview.appendChild(pre);
+  } else {
+    const na = document.createTextNode('Contenido no disponible.');
+    preview.appendChild(na);
+  }
+  card.appendChild(preview);
+
+  // — Actions —
+  const actions = document.createElement('div');
+  actions.className = 'gsp-card-actions';
+
+  const btnView = document.createElement('button');
+  btnView.className   = 'gsp-btn-view';
+  btnView.textContent = 'Ver contenido';
+  btnView.addEventListener('click', () => {
+    const open = preview.classList.toggle('hidden');
+    btnView.textContent = open ? 'Ver contenido' : 'Ocultar';
+    btnView.classList.toggle('active', !open);
+  });
+
+  const btnImp = document.createElement('button');
+  btnImp.className   = 'gsp-btn-import';
+  btnImp.textContent = 'Importar';
+  btnImp.disabled    = !hasDir;
+  if (!hasDir) btnImp.title = 'Conectá un directorio primero';
+  if (item.content) {
+    btnImp.addEventListener('click', () =>
+      importGithubSkill(item.content, displayName, btnImp)
+    );
+  } else {
+    btnImp.disabled = true;
+    btnImp.title    = 'Contenido no disponible';
+  }
+
+  actions.appendChild(btnView);
+  actions.appendChild(btnImp);
+  card.appendChild(actions);
+
+  return card;
+}
+
+async function importGithubSkill(content, suggestedName, btnEl) {
+  if (!FS.rootHandle) {
+    toast('Conectá un directorio primero', 'error');
+    return;
+  }
+
+  const baseName   = sanitizeName(suggestedName) || 'skill-importado';
+  const fileName   = `${baseName}.md`;
+  const destPath   = '';                  // raíz del proyecto
+  const targetHandle = FS.rootHandle;
+
+  // Resolver conflicto de nombre
+  const { finalName, conflict } = _resolveImportName(fileName, destPath);
+
+  if (btnEl) { btnEl.disabled = true; btnEl.textContent = '...'; }
+
+  try {
+    const newHandle = await targetHandle.getFileHandle(finalName, { create: true });
+    await FS.writeFile(newHandle, content);
+
+    const fileType  = await FS._detectFileType(finalName, newHandle, destPath);
+    const name      = finalName.replace(/\.md$/i, '');
+    const fullPath  = finalName;
+
+    const newSkill = {
+      name, path: fullPath, handle: newHandle,
+      dirHandle: targetHandle, dir: destPath,
+      virtual: false, fileType,
+    };
+
+    S.skills.push(newSkill);
+    closeGithubPanel();
+    renderList();
+    await openSkill(newSkill);
+
+    const msg = conflict
+      ? `Importado como "${finalName}" (renombrado para evitar conflicto)`
+      : `"${finalName}" importado correctamente`;
+    toast(msg, 'success');
+  } catch (e) {
+    toast('Error al importar: ' + e.message, 'error');
+    if (btnEl) { btnEl.disabled = false; btnEl.textContent = 'Importar'; }
   }
 }
 

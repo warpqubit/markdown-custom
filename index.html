@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="styles/sidebar.css"/>
   <link rel="stylesheet" href="styles/editor.css"/>
   <link rel="stylesheet" href="styles/catalog.css"/>
+  <link rel="stylesheet" href="styles/github-skills.css"/>
 </head>
 <body>
 
@@ -100,8 +101,34 @@
           <button id="btn-import" class="btn-import">
             ↑ Importar .md
           </button>
+          <button id="btn-github-skills" class="btn-import" style="margin-top:5px">
+            ↓ Skills de GitHub
+          </button>
         </div>
       </aside>
+
+      <!-- PANEL: GITHUB SKILLS (overlay sobre el sidebar) -->
+      <div id="github-skills-panel">
+        <div class="gsp-header">
+          <span class="gsp-title">Skills de GitHub</span>
+          <span id="gsp-count" class="gsp-count hidden">0</span>
+          <button id="btn-gsp-close" class="gsp-close" title="Cerrar">×</button>
+        </div>
+        <div class="gsp-token-row">
+          <div class="gsp-token-wrap">
+            <span id="gsp-token-dot" class="gsp-token-dot" title="Sin token: 60 req/hora"></span>
+            <input id="gsp-token" type="password" class="gsp-token-input"
+                   placeholder="ghp_... (opcional)" autocomplete="off"/>
+          </div>
+          <span id="gsp-rate-badge" class="gsp-rate-badge" title="Requests disponibles">—</span>
+        </div>
+        <div class="gsp-search-row">
+          <button id="btn-gsp-search" class="btn-primary gsp-btn-search">Buscar skills</button>
+        </div>
+        <div id="gsp-body" class="gsp-body">
+          <div class="gsp-empty">Presioná "Buscar skills" para descubrir SKILL.md en GitHub.</div>
+        </div>
+      </div>
 
       <div id="sidebar-resizer" class="panel-resizer"></div>
 
