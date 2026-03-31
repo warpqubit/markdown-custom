@@ -229,9 +229,26 @@ textarea { font-family: var(--mono); }
    ============================================================ */
 #main-layout {
   display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
+  grid-template-columns: var(--sidebar-w) 4px 1fr;
   overflow: hidden;
 }
+
+/* ============================================================
+   PANEL RESIZERS
+   ============================================================ */
+.panel-resizer {
+  width: 4px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+.panel-resizer:hover,
+.panel-resizer.dragging { background: var(--primary-mid); }
+
+.panel-resizer--v { cursor: col-resize; }
 
 /* ============================================================
    BUTTONS

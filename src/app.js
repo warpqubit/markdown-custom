@@ -1,15 +1,15 @@
-// app.js — Orquestador principal — Markdown Custom v1.0
+// app.js — Orquestador principal — Markdown Custom v1.1
 import { FS }      from './fs.js';
 import { Catalog } from './catalog.js';
 
 // ---- ESTADO ----
 const S = {
   skills:        [],
-  active:        null,   // { name, path, handle, dirHandle, dir, virtual, targetDirHandle? }
+  active:        null,   // { name, path, handle, dirHandle, dir, virtual, fileType, targetDirHandle? }
   savedContent:  '',
   draftContent:  '',
   pendingSkill:  null,   // skill al que el usuario quiere navegar sin guardar
-  directories:   [],     // [{ label, path, handle }] — para el modal de nuevo skill
+  directories:   [],     // [{ label, path, handle }] — para el modal de nuevo archivo
 };
 
 // ---- DOM ----
@@ -31,6 +31,7 @@ const UI = {
   emptyState:       el('empty-state'),
   editorPanel:      el('editor-panel'),
   editorName:       el('editor-skill-name'),
+  editorFileLabel:  el('editor-file-label'),
   editorBadge:      el('editor-skill-badge'),
   textarea:         el('editor-textarea'),
   preview:          el('editor-preview'),
@@ -45,6 +46,7 @@ const UI = {
   // Modals
   modalNew:          el('modal-new-skill'),
   newName:           el('new-skill-name'),
+  newTemplate:       el('new-file-template'),
   newDir:            el('new-skill-dir'),
   newPreview:        el('new-skill-preview-path'),
   btnConfirmNew:     el('btn-confirm-new-skill'),
@@ -64,6 +66,7 @@ const UI = {
 // =============================================
 function init() {
   initTheme();
+  initResizers();
 
   if (!window.showDirectoryPicker) {
     UI.compatWarning.classList.remove('hidden');
@@ -97,6 +100,68 @@ function syncThemeIcon() {
 }
 
 // =============================================
+// RESIZERS — sidebar y editor/preview
+// =============================================
+function initResizers() {
+  setupResizer(
+    document.getElementById('sidebar-resizer'),
+    () => parseInt(getComputedStyle(document.documentElement)
+            .getPropertyValue('--sidebar-w')),
+    (px) => {
+      const clamped = Math.min(Math.max(px, 160), 480);
+      document.documentElement.style.setProperty('--sidebar-w', clamped + 'px');
+      localStorage.setItem('mc_sidebar_w', clamped);
+    }
+  );
+
+  setupResizer(
+    document.getElementById('editor-resizer'),
+    () => {
+      const body = document.getElementById('editor-body');
+      if (!body) return 0;
+      const cols = getComputedStyle(body).gridTemplateColumns.split(' ');
+      return parseInt(cols[0]);
+    },
+    (px) => {
+      const body = document.getElementById('editor-body');
+      if (!body) return;
+      const totalW  = body.offsetWidth - 4;
+      const clamped = Math.min(Math.max(px, 200), totalW - 200);
+      body.style.gridTemplateColumns = `${clamped}px 4px 1fr`;
+    }
+  );
+
+  // Restaurar ancho guardado del sidebar
+  const saved = localStorage.getItem('mc_sidebar_w');
+  if (saved) document.documentElement.style.setProperty('--sidebar-w', saved + 'px');
+}
+
+function setupResizer(handle, getStart, applyWidth) {
+  if (!handle) return;
+  let startX, startW;
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    startX = e.clientX;
+    startW = getStart();
+    handle.classList.add('dragging');
+    document.body.style.cursor    = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMove = e => applyWidth(startW + (e.clientX - startX));
+    const onUp   = () => {
+      handle.classList.remove('dragging');
+      document.body.style.cursor    = '';
+      document.body.style.userSelect = '';
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  });
+}
+
+// =============================================
 // EVENTOS
 // =============================================
 function bindEvents() {
@@ -106,7 +171,7 @@ function bindEvents() {
 
   UI.skillSearch.addEventListener('input', () => renderList(UI.skillSearch.value));
 
-  // Nuevo skill: cargar directorios al abrir modal
+  // Nuevo archivo: cargar directorios al abrir modal
   UI.btnNewSkill.addEventListener('click', async () => {
     await populateNewSkillDirs();
     openModal('modal-new-skill');
@@ -118,17 +183,18 @@ function bindEvents() {
     const name = sanitizeName(UI.newName.value);
     const dir  = UI.newDir.value;
     const base = dir ? `${dir}/` : '';
-    UI.newPreview.textContent = name ? `${base}${name}/SKILL.md` : `${base}nombre/SKILL.md`;
+    UI.newPreview.textContent = name ? `${base}${name}.md` : `${base}nombre.md`;
   };
-  UI.newName.addEventListener('input', updateNewPreview);
-  UI.newDir.addEventListener('change', updateNewPreview);
+  UI.newName.addEventListener('input',  updateNewPreview);
+  UI.newDir.addEventListener('change',  updateNewPreview);
+  UI.newTemplate.addEventListener('change', updateNewPreview);
   UI.newName.addEventListener('keydown', e => { if (e.key === 'Enter') confirmNew(); });
   UI.btnConfirmNew.addEventListener('click', confirmNew);
 
   // Eliminar
   UI.btnDelete.addEventListener('click', () => {
     if (!S.active) return;
-    UI.deleteSkillName.textContent = S.active.name;
+    UI.deleteSkillName.textContent = S.active.path;
     openModal('modal-delete');
   });
   UI.btnConfirmDelete.addEventListener('click', confirmDelete);
@@ -152,7 +218,7 @@ function bindEvents() {
 
   UI.btnUnsavedDiscard.addEventListener('click', () => {
     closeModal('modal-unsaved');
-    // Si el skill activo era virtual, quitarlo de la lista
+    // Si el archivo activo era virtual, quitarlo de la lista
     if (S.active?.virtual) {
       S.skills = S.skills.filter(s => s.path !== S.active.path);
       S.active = null;
@@ -198,14 +264,14 @@ async function connectDir() {
 }
 
 // =============================================
-// CARGAR SKILLS
+// CARGAR ARCHIVOS
 // =============================================
 async function loadSkills() {
-  UI.skillList.innerHTML = '<li class="skill-empty">Buscando skills...</li>';
+  UI.skillList.innerHTML = '<li class="skill-empty">Buscando archivos...</li>';
   try {
-    // Mantener skills virtuales activos entre recargas
+    // Mantener archivos virtuales activos entre recargas
     const virtualSkills = S.skills.filter(s => s.virtual);
-    const found = await FS.findSkills();
+    const found = await FS.findMarkdownFiles();
     S.skills = [...found, ...virtualSkills];
     renderList();
     Catalog.init(S.skills, async (installedName) => {
@@ -236,7 +302,7 @@ function renderList(filter = '') {
   if (!list.length) {
     const msg = q
       ? 'Sin resultados'
-      : 'No hay skills.<br/>Creá uno con <b>+</b> o desde el catálogo.';
+      : 'No hay archivos .md.<br/>Creá uno con <b>+</b> o desde el catálogo.';
     UI.skillList.innerHTML = `<li class="skill-empty">${msg}</li>`;
     return;
   }
@@ -264,7 +330,7 @@ function renderList(filter = '') {
     header.textContent = groupKey === '' ? '/ raíz' : groupKey;
     UI.skillList.appendChild(header);
 
-    // Skills del grupo
+    // Archivos del grupo
     groupMap.get(groupKey).forEach(skill => {
       const li = document.createElement('li');
       const isActive = S.active?.path === skill.path;
@@ -273,8 +339,11 @@ function renderList(filter = '') {
       if (skill.virtual) li.classList.add('is-virtual');
 
       const displayName = skill.virtual ? `• ${skill.name}` : skill.name;
+      const ft          = skill.fileType || 'md';
+      const badge       = `<span class="file-type-badge type-${ft}">${ft.toUpperCase()}</span>`;
+
       li.innerHTML = `
-        <div class="skill-item-name">${escapeHtml(displayName)}</div>
+        <div class="skill-item-name">${badge}${escapeHtml(displayName)}</div>
         <div class="skill-item-path">${escapeHtml(skill.path)}</div>
       `;
       li.addEventListener('click', () => selectSkill(skill));
@@ -284,7 +353,7 @@ function renderList(filter = '') {
 }
 
 // =============================================
-// SELECCIONAR SKILL
+// SELECCIONAR ARCHIVO
 // =============================================
 async function selectSkill(skill) {
   if (S.active?.path === skill.path) return;
@@ -302,35 +371,36 @@ async function openSkill(skill) {
   try {
     let content;
     if (skill.virtual) {
-      content = FS._template(skill.name);
+      content = skill._initialContent ?? '';
     } else {
       content = await FS.readFile(skill.handle);
     }
 
     S.active       = skill;
-    S.savedContent = skill.virtual ? '' : content;  // virtual = nunca guardado
+    S.savedContent = skill.virtual ? '' : content;
     S.draftContent = content;
 
     UI.emptyState.classList.add('hidden');
     UI.editorPanel.classList.remove('hidden');
-    UI.editorName.textContent = skill.name;
-    UI.textarea.value         = content;
+    UI.editorName.textContent     = skill.name;
+    UI.editorFileLabel.textContent = skill.path.split('/').pop();
+    UI.textarea.value              = content;
     updatePreview(content);
     setStatus(skill.virtual ? 'unsaved' : 'saved');
     updateLineCol();
     updateFilesize(content);
 
-    // Badge
-    const isCustom = skill.virtual || !content.includes('author: anthropic');
-    UI.editorBadge.textContent = skill.virtual ? 'nuevo' : (isCustom ? 'custom' : 'verificado');
-    UI.editorBadge.className   = `skill-badge${skill.virtual ? ' custom' : (isCustom ? ' custom' : '')}`;
+    // Badge por tipo de archivo
+    const ft = skill.fileType || 'md';
+    UI.editorBadge.textContent = skill.virtual ? 'nuevo' : ft;
+    UI.editorBadge.className   = `skill-badge type-${ft}${skill.virtual ? ' custom' : ''}`;
     UI.editorBadge.classList.remove('hidden');
 
     UI.statusPath.textContent = skill.path;
     renderList(UI.skillSearch.value);
     UI.textarea.focus();
   } catch (e) {
-    toast('No se pudo abrir el skill', 'error');
+    toast('No se pudo abrir el archivo', 'error');
   }
 }
 
@@ -384,23 +454,25 @@ function updateFilesize(content) {
 }
 
 // =============================================
-// GUARDAR (crea el archivo si es virtual)
+// GUARDAR (materializa el archivo si es virtual)
 // =============================================
 async function save() {
   if (!S.active) return;
 
   if (S.active.virtual) {
-    // Materializar: crear el archivo físico por primera vez
     try {
       const { handle, dirHandle } = await FS.materializeSkill(
         S.active.targetDirHandle,
         S.active.name,
-        S.draftContent
+        S.draftContent,
+        { createSubdir: false }
       );
+
       S.active.handle          = handle;
       S.active.dirHandle       = dirHandle;
       S.active.virtual         = false;
       delete S.active.targetDirHandle;
+      delete S.active._initialContent;
       S.savedContent = S.draftContent;
       setStatus('saved');
 
@@ -410,13 +482,13 @@ async function save() {
       renderList(UI.skillSearch.value);
 
       // Actualizar badge
-      UI.editorBadge.textContent = 'custom';
-      UI.editorBadge.className   = 'skill-badge custom';
-      UI.editorBadge.classList.remove('hidden');
+      const ft = S.active.fileType || 'md';
+      UI.editorBadge.textContent = ft;
+      UI.editorBadge.className   = `skill-badge type-${ft}`;
 
-      toast(`Skill "${S.active.name}" creado en disco`, 'success');
+      toast(`"${S.active.name}.md" creado en disco`, 'success');
     } catch (e) {
-      toast('Error al crear el skill: ' + e.message, 'error');
+      toast('Error al crear el archivo: ' + e.message, 'error');
     }
     return;
   }
@@ -436,7 +508,7 @@ async function save() {
 }
 
 // =============================================
-// EXPORTAR SKILL
+// EXPORTAR ARCHIVO
 // =============================================
 async function exportSkill() {
   if (!S.active) return;
@@ -452,7 +524,6 @@ async function exportSkill() {
       types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
     });
 
-    // Verificar que no es el mismo archivo fuente (solo para skills ya guardados)
     if (S.active.handle) {
       const isSame = await pickedHandle.isSameEntry(S.active.handle).catch(() => false);
       if (isSame) {
@@ -469,7 +540,7 @@ async function exportSkill() {
 }
 
 // =============================================
-// NUEVO SKILL — modal con selección de directorio
+// NUEVO ARCHIVO — modal con selección de directorio
 // =============================================
 async function populateNewSkillDirs() {
   UI.newDir.innerHTML = '<option value="" disabled>Cargando...</option>';
@@ -486,27 +557,52 @@ async function populateNewSkillDirs() {
     UI.newDir.innerHTML = '<option value="">/ raíz</option>';
     S.directories = [{ label: '/ raíz', path: '', handle: FS.rootHandle }];
   }
-  // Resetear preview
-  UI.newPreview.textContent = 'nombre/SKILL.md';
+  UI.newPreview.textContent = 'nombre.md';
+  UI.newName.value     = '';
+  UI.newTemplate.value = 'blank';
+}
+
+function _getTemplateContent(templateKey, name) {
+  switch (templateKey) {
+    case 'skill':  return FS._template(name);
+    case 'rules':  return FS._templateRules();
+    case 'prompt': return FS._templatePrompt();
+    case 'gemini': return FS._templateGemini();
+    default:       return '';
+  }
+}
+
+function _getFileTypeFromTemplate(templateKey) {
+  switch (templateKey) {
+    case 'skill':  return 'skill';
+    case 'rules':  return 'rules';
+    case 'prompt': return 'prompt';
+    case 'gemini': return 'rules';
+    default:       return 'md';
+  }
 }
 
 async function confirmNew() {
   const name = sanitizeName(UI.newName.value);
   if (!name) { UI.newName.focus(); return; }
 
-  const selectedPath = UI.newDir.value;
-  const dirEntry     = S.directories.find(d => d.path === selectedPath);
-  const targetHandle = dirEntry ? dirEntry.handle : FS.rootHandle;
+  const selectedPath  = UI.newDir.value;
+  const templateKey   = UI.newTemplate.value;
+  const dirEntry      = S.directories.find(d => d.path === selectedPath);
+  const targetHandle  = dirEntry ? dirEntry.handle : FS.rootHandle;
 
-  const fullPath = selectedPath ? `${selectedPath}/${name}/SKILL.md` : `${name}/SKILL.md`;
+  const fullPath = selectedPath ? `${selectedPath}/${name}.md` : `${name}.md`;
 
   // Verificar duplicado
   if (S.skills.find(s => s.path === fullPath)) {
-    toast(`Ya existe un skill "${name}" en ese directorio`, 'error');
+    toast(`Ya existe "${name}.md" en ese directorio`, 'error');
     return;
   }
 
-  // Crear skill virtual (en memoria, sin archivo en disco)
+  const initialContent = _getTemplateContent(templateKey, name);
+  const fileType       = _getFileTypeFromTemplate(templateKey);
+
+  // Crear archivo virtual (en memoria, sin archivo en disco)
   const virtualSkill = {
     name,
     path:            fullPath,
@@ -514,7 +610,9 @@ async function confirmNew() {
     dirHandle:       null,
     dir:             selectedPath,
     virtual:         true,
+    fileType,
     targetDirHandle: targetHandle,
+    _initialContent: initialContent,
   };
 
   closeModal('modal-new-skill');
@@ -523,16 +621,16 @@ async function confirmNew() {
   S.skills.push(virtualSkill);
   renderList();
   await openSkill(virtualSkill);
-  toast(`Skill "${name}" listo — guardá para crear el archivo`, 'info');
+  toast(`"${name}.md" listo — guardá para crear el archivo`, 'info');
 }
 
 // =============================================
-// ELIMINAR SKILL
+// ELIMINAR ARCHIVO
 // =============================================
 async function confirmDelete() {
   if (!S.active) return;
 
-  // Skill virtual: solo quitar de memoria
+  // Archivo virtual: solo quitar de memoria
   if (S.active.virtual) {
     const name   = S.active.name;
     S.skills     = S.skills.filter(s => s.path !== S.active.path);
@@ -543,12 +641,12 @@ async function confirmDelete() {
     UI.editorPanel.classList.add('hidden');
     UI.emptyState.classList.remove('hidden');
     renderList();
-    toast(`Skill "${name}" descartado`, 'success');
+    toast(`"${name}.md" descartado`, 'success');
     return;
   }
 
   try {
-    await FS.deleteSkillFile(S.active.dirHandle);
+    await FS.deleteSkillFile(S.active.handle, S.active.dirHandle);
     const name = S.active.name;
     S.skills       = S.skills.filter(s => s.path !== S.active.path);
     S.active       = null;
@@ -558,7 +656,7 @@ async function confirmDelete() {
     UI.editorPanel.classList.add('hidden');
     UI.emptyState.classList.remove('hidden');
     renderList();
-    toast(`Skill "${name}" eliminado`, 'success');
+    toast(`"${name}" eliminado`, 'success');
   } catch (e) {
     toast('Error al eliminar: ' + e.message, 'error');
     closeModal('modal-delete');

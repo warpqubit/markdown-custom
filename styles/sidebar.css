@@ -102,6 +102,9 @@
 .skill-item.active .skill-item-name { color: var(--accent); }
 
 .skill-item-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
   font-weight: 600;
   color: var(--text);
@@ -110,6 +113,21 @@
   text-overflow: ellipsis;
   transition: color .12s;
 }
+
+/* FILE TYPE BADGES */
+.file-type-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  flex-shrink: 0;
+}
+.type-skill  { background: var(--primary-light); color: var(--primary); }
+.type-rules  { background: var(--warning-light); color: var(--warning); }
+.type-prompt { background: var(--success-light); color: var(--success); }
+.type-md     { background: var(--subtle); color: var(--text-3); border: 0.5px solid var(--border-md); }
 
 .skill-item-path {
   font-size: 10px;

@@ -39,12 +39,12 @@
         </svg>
         <div class="welcome-brand">
           <span class="brand-main">Markdown Custom</span>
-          <span class="brand-sub">skill manager · v1.0</span>
+          <span class="brand-sub">markdown manager · v1.1</span>
         </div>
       </div>
       <p class="welcome-desc">
-        Conectá tu proyecto y gestioná todos tus skills locales.<br/>
-        Detecta automáticamente cualquier <code>SKILL.md</code> en el directorio.
+        Conectá tu proyecto y gestioná todos tus archivos <code>.md</code>.<br/>
+        Detecta automáticamente skills, rules, prompts y cualquier markdown.
       </p>
       <button id="btn-connect" class="btn-primary">
         Conectar directorio
@@ -75,7 +75,7 @@
         <span id="topbar-path" class="topbar-path">sin directorio</span>
       </div>
       <div class="topbar-right">
-        <button id="btn-reload" class="btn-ghost" title="Recargar skills">↺ Recargar</button>
+        <button id="btn-reload" class="btn-ghost" title="Recargar archivos">↺ Recargar</button>
         <button id="btn-change-dir" class="btn-ghost">Cambiar directorio</button>
         <button id="btn-theme-toggle" class="btn-theme" title="Cambiar tema" aria-label="Cambiar tema">
           <span id="theme-icon-sun" class="theme-icon">☀</span>
@@ -88,12 +88,12 @@
 
       <aside id="sidebar">
         <div class="sidebar-head">
-          <span class="sidebar-label">Skills</span>
+          <span class="sidebar-label">Archivos</span>
           <span id="skills-count" class="sidebar-count">0</span>
-          <button id="btn-new-skill" class="sidebar-add" title="Crear nuevo skill">+</button>
+          <button id="btn-new-skill" class="sidebar-add" title="Crear nuevo archivo">+</button>
         </div>
         <div id="skill-search-wrap">
-          <input id="skill-search" type="text" placeholder="Buscar skill..." autocomplete="off"/>
+          <input id="skill-search" type="text" placeholder="Buscar archivo..." autocomplete="off"/>
         </div>
         <ul id="skill-list"></ul>
         <div class="sidebar-footer">
@@ -103,13 +103,15 @@
         </div>
       </aside>
 
+      <div id="sidebar-resizer" class="panel-resizer"></div>
+
       <main id="content-area">
         <div id="empty-state">
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none" opacity="0.25">
             <rect x="5" y="3" width="26" height="30" rx="4" stroke="currentColor" stroke-width="1.5"/>
             <path d="M11 12h14M11 17h9M11 22h11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          <p>Seleccioná un skill para editarlo</p>
+          <p>Seleccioná un archivo para editarlo</p>
         </div>
 
         <div id="editor-panel" class="hidden">
@@ -117,20 +119,21 @@
             <div class="editor-breadcrumb">
               <span id="editor-skill-name" class="editor-skill-name"></span>
               <span class="editor-sep">/</span>
-              <span class="editor-file">SKILL.md</span>
+              <span id="editor-file-label" class="editor-file"></span>
             </div>
             <div class="editor-actions">
               <span id="editor-skill-badge" class="skill-badge hidden"></span>
               <button id="btn-export-skill" class="btn-ghost btn-sm">↓ Exportar</button>
-              <button id="btn-delete-skill" class="btn-danger-ghost">eliminar skill</button>
+              <button id="btn-delete-skill" class="btn-danger-ghost">eliminar</button>
             </div>
           </div>
 
           <div id="editor-body">
             <div id="editor-pane">
               <div class="pane-label">Editor</div>
-              <textarea id="editor-textarea" spellcheck="false" placeholder="# Nombre del skill&#10;&#10;Escribí las instrucciones del skill..."></textarea>
+              <textarea id="editor-textarea" spellcheck="false" placeholder="# Título&#10;&#10;Escribí el contenido..."></textarea>
             </div>
+            <div id="editor-resizer" class="panel-resizer panel-resizer--v"></div>
             <div id="preview-pane">
               <div class="pane-label">Preview</div>
               <div id="editor-preview"></div>
@@ -158,23 +161,32 @@
     </div>
   </div>
 
-  <!-- MODAL: NUEVO SKILL -->
+  <!-- MODAL: NUEVO ARCHIVO -->
   <div id="modal-new-skill" class="modal-overlay hidden">
     <div class="modal">
       <div class="modal-head">
-        <span class="modal-title">Nuevo skill</span>
+        <span class="modal-title">Nuevo archivo</span>
         <button class="modal-close" data-modal="modal-new-skill">×</button>
       </div>
       <div class="modal-body">
-        <label class="field-label">Nombre del skill</label>
-        <input id="new-skill-name" type="text" class="field-input" placeholder="ej: python-scripts" autocomplete="off"/>
+        <label class="field-label">Nombre del archivo</label>
+        <input id="new-skill-name" type="text" class="field-input" placeholder="ej: mis-notas" autocomplete="off"/>
+
+        <label class="field-label" style="margin-top:12px">Template</label>
+        <select id="new-file-template" class="field-input field-select">
+          <option value="blank">En blanco</option>
+          <option value="skill">SKILL (Claude Code)</option>
+          <option value="rules">RULES (CLAUDE.md / .cursorrules)</option>
+          <option value="prompt">PROMPT genérico</option>
+          <option value="gemini">GEMINI / Codex</option>
+        </select>
 
         <label class="field-label" style="margin-top:12px">Directorio destino</label>
         <select id="new-skill-dir" class="field-input field-select">
           <option value="">/ raíz</option>
         </select>
 
-        <p class="field-hint">Se creará: <code id="new-skill-preview-path">nombre/SKILL.md</code></p>
+        <p class="field-hint">Se creará: <code id="new-skill-preview-path">nombre.md</code></p>
         <p class="field-hint" style="margin-top:4px;color:var(--accent)">
           El archivo se guarda en disco al presionar <strong>Guardar</strong> en el editor.
         </p>
@@ -190,12 +202,12 @@
   <div id="modal-delete" class="modal-overlay hidden">
     <div class="modal modal-sm">
       <div class="modal-head">
-        <span class="modal-title">Eliminar skill</span>
+        <span class="modal-title">Eliminar archivo</span>
         <button class="modal-close" data-modal="modal-delete">×</button>
       </div>
       <div class="modal-body">
-        <p class="modal-text">¿Eliminar el skill <strong id="delete-skill-name"></strong>?</p>
-        <p class="modal-subtext">Esto borra el <code>SKILL.md</code> del disco. No se puede deshacer.</p>
+        <p class="modal-text">¿Eliminar <strong id="delete-skill-name"></strong>?</p>
+        <p class="modal-subtext">Esto borra el archivo del disco. No se puede deshacer.</p>
       </div>
       <div class="modal-footer">
         <button class="btn-ghost" data-modal="modal-delete">Cancelar</button>

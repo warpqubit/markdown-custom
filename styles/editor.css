@@ -65,7 +65,7 @@
 #editor-body {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 4px 1fr;
   overflow: hidden;
   border-bottom: 0.5px solid var(--border);
 }
@@ -78,7 +78,7 @@
   min-width: 0;
 }
 
-#editor-pane { border-right: 0.5px solid var(--border); }
+/* border separado por el resizer; el resizer actúa como divisor */
 
 .pane-label {
   padding: 5px 14px;
