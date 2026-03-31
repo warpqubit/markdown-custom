@@ -2,37 +2,79 @@
 import { GitHub } from './github.js';
 import { FS }     from './fs.js';
 
-// ---- MOCK DATA — usado cuando la API de GitHub falla ----
+// ---- MOCK DATA ---------------------------------------------------------------
+const now = Date.now();
+const daysAgo = d => new Date(now - d * 86400000).toISOString();
+
 const MOCK_SKILLS = [
-  { name: 'sequential-thinking',   path: 'sequential-thinking/SKILL.md',   downloadUrl: null, description: 'Descompone problemas en cadenas de razonamiento paso a paso.', tags: ['reasoning', 'thinking'] },
-  { name: 'memory-management',     path: 'memory-management/SKILL.md',     downloadUrl: null, description: 'Gestiona contexto de proyecto entre conversaciones.',           tags: ['memory', 'context'] },
-  { name: 'code-review',           path: 'code-review/SKILL.md',           downloadUrl: null, description: 'Revisión detallada de código con mejores prácticas.',           tags: ['coding', 'quality'] },
-  { name: 'web-research',          path: 'web-research/SKILL.md',          downloadUrl: null, description: 'Investiga y sintetiza información de fuentes web.',             tags: ['research'] },
-  { name: 'sql-expert',            path: 'sql-expert/SKILL.md',            downloadUrl: null, description: 'Escribe y optimiza queries SQL complejas.',                     tags: ['sql', 'database'] },
-  { name: 'python-data-analysis',  path: 'python-data-analysis/SKILL.md',  downloadUrl: null, description: 'Análisis de datos con pandas, numpy y matplotlib.',            tags: ['python', 'data'] },
-  { name: 'git-workflow',          path: 'git-workflow/SKILL.md',          downloadUrl: null, description: 'Flujo de trabajo con Git, branches y pull requests.',           tags: ['git', 'devops'] },
-  { name: 'api-design',            path: 'api-design/SKILL.md',            downloadUrl: null, description: 'Diseño de APIs REST y GraphQL con buenas prácticas.',           tags: ['api', 'backend'] },
-  { name: 'debugging-systematic',  path: 'debugging-systematic/SKILL.md',  downloadUrl: null, description: 'Proceso sistemático para encontrar y resolver bugs.',           tags: ['debugging'] },
-  { name: 'technical-writing',     path: 'technical-writing/SKILL.md',     downloadUrl: null, description: 'Redacción de documentación técnica clara y concisa.',           tags: ['docs', 'writing'] },
-  { name: 'test-driven-dev',       path: 'test-driven-dev/SKILL.md',       downloadUrl: null, description: 'Desarrollo guiado por tests unitarios e integración.',          tags: ['testing', 'quality'] },
-  { name: 'refactoring-patterns',  path: 'refactoring-patterns/SKILL.md',  downloadUrl: null, description: 'Patrones seguros de refactorización sin romper funcionalidad.',  tags: ['refactoring', 'patterns'] },
+  // Reasoning
+  { name: 'sequential-thinking',   description: 'Descompone problemas complejos en cadenas de razonamiento paso a paso.',    tags: ['reasoning', 'thinking'],    stars: 1842, lastCommit: daysAgo(2),  author: 'anthropic' },
+  { name: 'chain-of-thought',      description: 'Genera respuestas usando razonamiento explícito antes de la conclusión.',    tags: ['reasoning', 'thinking'],    stars: 1210, lastCommit: daysAgo(5),  author: 'anthropic' },
+  { name: 'socratic-questioning',  description: 'Usa preguntas guiadas para descubrir soluciones junto al usuario.',         tags: ['reasoning', 'teaching'],    stars: 742,  lastCommit: daysAgo(12), author: 'anthropic' },
+  { name: 'first-principles',      description: 'Razonamiento desde principios fundamentales sin asumir restricciones.',     tags: ['reasoning', 'analysis'],    stars: 680,  lastCommit: daysAgo(8),  author: 'anthropic' },
+
+  // Memory & Context
+  { name: 'memory-management',     description: 'Gestiona contexto de proyecto entre conversaciones de forma persistente.',  tags: ['memory', 'context'],        stars: 2140, lastCommit: daysAgo(1),  author: 'anthropic' },
+  { name: 'context-summarizer',    description: 'Resume automáticamente conversaciones largas para preservar contexto.',     tags: ['memory', 'context'],        stars: 920,  lastCommit: daysAgo(4),  author: 'anthropic' },
+  { name: 'project-tracker',       description: 'Rastrea tareas, decisiones y progreso del proyecto entre sesiones.',        tags: ['memory', 'productivity'],   stars: 1050, lastCommit: daysAgo(3),  author: 'anthropic' },
+
+  // Coding — Quality
+  { name: 'code-review',           description: 'Revisión exhaustiva de código: correctitud, seguridad y mantenibilidad.',   tags: ['coding', 'quality'],        stars: 3120, lastCommit: daysAgo(1),  author: 'anthropic' },
+  { name: 'test-driven-dev',       description: 'Desarrollo guiado por tests unitarios, de integración y e2e.',             tags: ['testing', 'quality'],       stars: 1860, lastCommit: daysAgo(6),  author: 'anthropic' },
+  { name: 'debugging-systematic',  description: 'Proceso sistemático con hipótesis y evidencia para encontrar bugs.',        tags: ['debugging', 'quality'],     stars: 1340, lastCommit: daysAgo(9),  author: 'anthropic' },
+  { name: 'refactoring-patterns',  description: 'Patrones seguros de refactorización sin romper funcionalidad existente.',   tags: ['refactoring', 'quality'],   stars: 980,  lastCommit: daysAgo(14), author: 'anthropic' },
+  { name: 'code-generation',       description: 'Genera código limpio, documentado y listo para producción.',               tags: ['coding', 'generation'],     stars: 2450, lastCommit: daysAgo(2),  author: 'anthropic' },
+
+  // Languages & Runtimes
+  { name: 'python-data-analysis',  description: 'Análisis de datos con pandas, numpy, matplotlib y scikit-learn.',          tags: ['python', 'data'],           stars: 2880, lastCommit: daysAgo(3),  author: 'anthropic' },
+  { name: 'typescript-strict',     description: 'TypeScript con tipos estrictos, generics y patrones avanzados.',            tags: ['typescript', 'coding'],     stars: 1640, lastCommit: daysAgo(7),  author: 'community' },
+  { name: 'rust-ownership',        description: 'Explica ownership, borrowing y lifetimes de Rust con ejemplos claros.',     tags: ['rust', 'coding'],           stars: 1120, lastCommit: daysAgo(11), author: 'community' },
+
+  // DevOps & Infrastructure
+  { name: 'git-workflow',          description: 'Flujo de trabajo con Git, Conventional Commits y pull requests.',           tags: ['git', 'devops'],            stars: 2210, lastCommit: daysAgo(4),  author: 'anthropic' },
+  { name: 'docker-compose-expert', description: 'Configuración de contenedores Docker, compose y orquestación.',             tags: ['docker', 'devops'],         stars: 1450, lastCommit: daysAgo(8),  author: 'anthropic' },
+  { name: 'ci-cd-pipeline',        description: 'Configuración de pipelines CI/CD con GitHub Actions y GitLab CI.',          tags: ['cicd', 'devops'],           stars: 1280, lastCommit: daysAgo(10), author: 'anthropic' },
+
+  // Data & API
+  { name: 'sql-expert',            description: 'Escribe, optimiza y explica queries SQL complejas para cualquier engine.',   tags: ['sql', 'database'],          stars: 2760, lastCommit: daysAgo(2),  author: 'anthropic' },
+  { name: 'data-modeling',         description: 'Diseño de esquemas de base de datos relacionales y NoSQL optimizados.',     tags: ['database', 'architecture'], stars: 1180, lastCommit: daysAgo(13), author: 'anthropic' },
+  { name: 'api-design',            description: 'Diseño de APIs REST y GraphQL con buenas prácticas y spec OpenAPI.',        tags: ['api', 'backend'],           stars: 2040, lastCommit: daysAgo(5),  author: 'anthropic' },
+  { name: 'graphql-schema',        description: 'Diseño de schemas GraphQL, resolvers eficientes y N+1 prevention.',         tags: ['graphql', 'api'],           stars: 880,  lastCommit: daysAgo(18), author: 'community' },
+
+  // Writing & Docs
+  { name: 'technical-writing',     description: 'Redacción de documentación técnica clara, concisa y bien estructurada.',    tags: ['docs', 'writing'],          stars: 1540, lastCommit: daysAgo(6),  author: 'anthropic' },
+  { name: 'changelog-generator',   description: 'Genera CHANGELOGs claros a partir de commits y pull requests.',             tags: ['docs', 'devops'],           stars: 640,  lastCommit: daysAgo(20), author: 'community' },
+  { name: 'blog-post-writer',      description: 'Redacta artículos técnicos con estructura, ejemplos y SEO básico.',         tags: ['writing', 'content'],       stars: 1020, lastCommit: daysAgo(15), author: 'community' },
+
+  // Research & Analysis
+  { name: 'web-research',          description: 'Investiga, sintetiza y cita fuentes web con rigor metodológico.',           tags: ['research', 'analysis'],     stars: 1760, lastCommit: daysAgo(3),  author: 'anthropic' },
+  { name: 'competitive-analysis',  description: 'Análisis de competencia con framework estructurado y métricas.',            tags: ['research', 'business'],     stars: 820,  lastCommit: daysAgo(22), author: 'community' },
+
+  // Product & PM
+  { name: 'user-story-writer',     description: 'Redacta user stories en formato BDD con criterios de aceptación claros.',   tags: ['pm', 'agile'],              stars: 1120, lastCommit: daysAgo(9),  author: 'anthropic' },
+  { name: 'meeting-summarizer',    description: 'Estructura notas de reuniones con decisiones, action items y owners.',      tags: ['pm', 'productivity'],       stars: 940,  lastCommit: daysAgo(7),  author: 'anthropic' },
+  { name: 'okr-planning',          description: 'Define OKRs SMART con métricas de seguimiento y planes de acción.',         tags: ['pm', 'business'],           stars: 760,  lastCommit: daysAgo(25), author: 'community' },
+
+  // Security
+  { name: 'security-audit',        description: 'Auditoría de seguridad: OWASP Top 10, SAST y mejores prácticas.',           tags: ['security', 'quality'],      stars: 1480, lastCommit: daysAgo(4),  author: 'anthropic' },
+  { name: 'system-design',         description: 'Diseño de sistemas escalables con patrones de arquitectura modernos.',      tags: ['architecture', 'backend'],  stars: 2320, lastCommit: daysAgo(6),  author: 'anthropic' },
 ];
 
 const MOCK_METRICS = {
   stars: 2847, forks: 312,
-  lastCommit: new Date(Date.now() - 2 * 86400000).toISOString(),
+  lastCommit: daysAgo(2),
   daysSince: 2,
   score: 91,
 };
 
-// Genera contenido SKILL.md para skills de mock
 function mockSkillContent(skill) {
+  const tagList = skill.tags.map(t => `"${t}"`).join(', ');
   return `---
 name: ${skill.name}
 description: ${skill.description}
-tags: [${skill.tags.map(t => `"${t}"`).join(', ')}]
+tags: [${tagList}]
 version: 1.0.0
-author: anthropic
+author: ${skill.author || 'anthropic'}
 ---
 
 # ${skill.name}
@@ -43,66 +85,66 @@ ${skill.description}
 
 ## Instrucciones
 
-1. Activar este skill cuando el usuario solicite ayuda con: ${skill.tags.join(', ')}.
-2. Seguir las guías y mejores prácticas del área.
-3. Proporcionar respuestas detalladas y ejemplos concretos.
+1. Activar este skill cuando el usuario necesite ayuda con: ${skill.tags.join(', ')}.
+2. Seguir las guías y mejores prácticas específicas del área.
+3. Proporcionar respuestas estructuradas con ejemplos concretos.
+4. Verificar el resultado final antes de entregar.
 
 ## Notas
 
-- Skill verificado por el equipo de Anthropic.
-- Actualizado regularmente con mejores prácticas.
+- Skill del catálogo oficial de Markdown Custom.
+- Actualizado regularmente con mejores prácticas del sector.
+- Tags: ${skill.tags.join(', ')}.
 `;
 }
 
-// ---- CATÁLOGO ----
+// ---- CATÁLOGO ----------------------------------------------------------------
 export const Catalog = {
   installedNames: new Set(),
   onInstalled:    null,
   _isMock:        false,
+  _remoteSkills:  null,
+  _metrics:       null,
+  _activeTag:     null,
 
   init(installedSkills, onInstalledCb) {
     this.installedNames = new Set(installedSkills.map(s => s.name));
     this.onInstalled    = onInstalledCb;
 
-    const btnCatalog = document.getElementById('btn-catalog');
     // Remover listener previo clonando el nodo
+    const btnCatalog = document.getElementById('btn-catalog');
     const fresh = btnCatalog.cloneNode(true);
     btnCatalog.parentNode.replaceChild(fresh, btnCatalog);
     fresh.addEventListener('click', () => this.open());
 
-    document.getElementById('catalog-search').addEventListener('input', e =>
-      this._filter(e.target.value)
-    );
-  },
-
-  updateInstalled(skills) {
-    this.installedNames = new Set(skills.map(s => s.name));
+    const searchInput = document.getElementById('catalog-search');
+    searchInput.addEventListener('input', e => this._filter(e.target.value));
   },
 
   async open() {
+    this._activeTag = null;
     document.getElementById('modal-catalog').classList.remove('hidden');
     document.getElementById('catalog-search').value = '';
     await this._load();
   },
 
-  _remoteSkills: null,
-  _metrics:      null,
-
   async _load() {
     const body = document.getElementById('catalog-body');
     body.innerHTML = '<div class="catalog-loading">Conectando con GitHub...</div>';
+    document.getElementById('catalog-tags').innerHTML = '';
 
     try {
       const [skills, metrics] = await Promise.all([
         GitHub.listRemoteSkills(),
         GitHub.getRepoMetrics(),
       ]);
+
+      // Enriquecer skills remotos con descripción si tienen frontmatter
       this._remoteSkills = skills;
       this._metrics      = metrics;
       this._isMock       = false;
       this._render(skills, metrics);
     } catch (_err) {
-      // Fallback silencioso a datos mock
       this._remoteSkills = MOCK_SKILLS;
       this._metrics      = MOCK_METRICS;
       this._isMock       = true;
@@ -118,17 +160,57 @@ export const Catalog = {
       return;
     }
 
+    // Tag chips — siempre reflejan el dataset completo
+    this._renderTagChips(this._remoteSkills || skills);
+
     body.innerHTML = '';
 
     if (this._isMock) {
       const notice = document.createElement('div');
       notice.className   = 'catalog-mock-notice';
-      notice.textContent = '📦 Mostrando catálogo de ejemplo — sin conexión a GitHub';
+      notice.textContent = '📦 Modo sin conexión — mostrando catálogo de ejemplo';
       body.appendChild(notice);
     }
 
     skills.forEach(skill => {
       body.appendChild(this._buildCard(skill, metrics));
+    });
+  },
+
+  _renderTagChips(skills) {
+    const bar = document.getElementById('catalog-tags');
+    if (!bar) return;
+
+    // Recopilar tags únicos en orden de aparición
+    const seen = new Set();
+    const tags = [];
+    skills.forEach(s => {
+      (s.tags || []).forEach(t => {
+        if (!seen.has(t)) { seen.add(t); tags.push(t); }
+      });
+    });
+
+    bar.innerHTML = '';
+
+    // "Todos"
+    const allChip = document.createElement('button');
+    allChip.className   = `c-chip${this._activeTag === null ? ' active' : ''}`;
+    allChip.textContent = 'Todos';
+    allChip.addEventListener('click', () => {
+      this._activeTag = null;
+      this._filter(document.getElementById('catalog-search').value);
+    });
+    bar.appendChild(allChip);
+
+    tags.forEach(tag => {
+      const chip = document.createElement('button');
+      chip.className   = `c-chip${this._activeTag === tag ? ' active' : ''}`;
+      chip.textContent = tag;
+      chip.addEventListener('click', () => {
+        this._activeTag = this._activeTag === tag ? null : tag;
+        this._filter(document.getElementById('catalog-search').value);
+      });
+      bar.appendChild(chip);
     });
   },
 
@@ -138,13 +220,25 @@ export const Catalog = {
     div.className        = `catalog-item${installed ? ' is-installed' : ''}`;
     div.dataset.skillName = skill.name;
 
-    const icon     = skill.name.substring(0, 4).toUpperCase();
-    const score    = metrics?.score    ?? '—';
-    const stars    = metrics?.stars    ?? '—';
-    const forks    = metrics?.forks    ?? '—';
-    const age      = metrics ? GitHub.formatAge(metrics.lastCommit) : '—';
-    const trending = metrics?.daysSince !== null && metrics.daysSince < 7;
-    const desc     = skill.description || 'Skill del repositorio oficial de Anthropic';
+    const icon = skill.name.substring(0, 4).toUpperCase();
+    const desc = skill.description || 'Skill del repositorio oficial de Anthropic';
+
+    // Métricas: per-skill si disponible, fallback a repo
+    const stars    = skill.stars    ?? metrics?.stars    ?? '—';
+    const lastCmt  = skill.lastCommit ?? metrics?.lastCommit ?? null;
+    const forks    = metrics?.forks   ?? '—';
+    const score    = metrics?.score   ?? '—';
+    const age      = lastCmt ? GitHub.formatAge(lastCmt) : '—';
+
+    const daysAgo  = lastCmt ? Math.floor((Date.now() - new Date(lastCmt)) / 86400000) : null;
+    const trending = daysAgo !== null && daysAgo < 7;
+    const author   = skill.author || 'anthropic';
+    const isOfficial = author === 'anthropic';
+
+    // Tags del skill
+    const tagsHtml = (skill.tags || []).map(t =>
+      `<span class="c-tag">${t}</span>`
+    ).join('');
 
     div.innerHTML = `
       <div class="catalog-icon">${icon}</div>
@@ -152,11 +246,13 @@ export const Catalog = {
         <div class="catalog-name">${skill.name}</div>
         <div class="catalog-desc">${desc}</div>
         <div class="catalog-tags">
-          <span class="c-tag verified">✓ verificado</span>
-          <span class="c-tag">anthropic/skills</span>
+          <span class="c-tag ${isOfficial ? 'verified' : 'community'}">
+            ${isOfficial ? '✓ verificado' : '◈ community'}
+          </span>
+          ${tagsHtml}
         </div>
         <div class="catalog-metrics">
-          <span class="c-metric ${typeof stars === 'number' && stars > 100 ? 'good' : ''}">★ ${stars}</span>
+          <span class="c-metric ${typeof stars === 'number' && stars > 1000 ? 'good' : ''}">★ ${stars}</span>
           <span class="c-metric">⑂ ${forks}</span>
           <span class="c-metric ${trending ? 'hot' : ''}">↻ ${age}</span>
         </div>
@@ -181,12 +277,19 @@ export const Catalog = {
   _filter(query) {
     if (!this._remoteSkills) return;
     const q = query.toLowerCase();
-    const filtered = q
+
+    let filtered = q
       ? this._remoteSkills.filter(s =>
           s.name.toLowerCase().includes(q) ||
-          (s.description || '').toLowerCase().includes(q)
+          (s.description || '').toLowerCase().includes(q) ||
+          (s.tags || []).some(t => t.includes(q))
         )
-      : this._remoteSkills;
+      : [...this._remoteSkills];
+
+    if (this._activeTag) {
+      filtered = filtered.filter(s => (s.tags || []).includes(this._activeTag));
+    }
+
     this._render(filtered, this._metrics);
   },
 
@@ -195,7 +298,6 @@ export const Catalog = {
     if (btn) { btn.textContent = 'Instalando...'; btn.disabled = true; }
 
     try {
-      // Obtener contenido: remoto o generar desde mock
       let content;
       if (skill.downloadUrl) {
         content = await GitHub.downloadSkill(skill.downloadUrl);
@@ -206,7 +308,6 @@ export const Catalog = {
       const created = await FS.createSkill(skill.name);
       await FS.writeFile(created.handle, content);
 
-      // Marcar como instalado en la UI
       this.installedNames.add(skill.name);
       const card = document.querySelector(`[data-skill-name="${skill.name}"]`);
       if (card) {

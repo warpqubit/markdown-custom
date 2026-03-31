@@ -137,6 +137,31 @@
   list-style: none;
 }
 
+/* DIRECTORY GROUP HEADERS */
+.skill-dir-header {
+  padding: 8px 10px 3px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  font-family: var(--mono);
+  list-style: none;
+  pointer-events: none;
+  user-select: none;
+}
+.skill-dir-header.has-separator {
+  margin-top: 4px;
+  border-top: 0.5px solid var(--border);
+  padding-top: 10px;
+}
+
+/* Virtual (unsaved) skills in sidebar */
+.skill-item.is-virtual .skill-item-name {
+  color: var(--accent);
+  font-style: italic;
+}
+
 /* FOOTER */
 .sidebar-footer {
   padding: 8px 6px;

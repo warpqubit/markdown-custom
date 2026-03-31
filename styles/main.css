@@ -290,6 +290,22 @@ textarea { font-family: var(--mono); }
 }
 .btn-danger-ghost:hover { color: var(--danger); background: var(--danger-light); }
 
+/* Small button variant */
+.btn-sm {
+  padding: 4px 10px !important;
+  font-size: 11px !important;
+}
+
+/* Select field */
+.field-select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%239A9892' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px !important;
+  cursor: pointer;
+}
+
 /* Theme toggle */
 .btn-theme {
   width: 30px;

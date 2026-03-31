@@ -121,6 +121,7 @@
             </div>
             <div class="editor-actions">
               <span id="editor-skill-badge" class="skill-badge hidden"></span>
+              <button id="btn-export-skill" class="btn-ghost btn-sm">↓ Exportar</button>
               <button id="btn-delete-skill" class="btn-danger-ghost">eliminar skill</button>
             </div>
           </div>
@@ -167,11 +168,20 @@
       <div class="modal-body">
         <label class="field-label">Nombre del skill</label>
         <input id="new-skill-name" type="text" class="field-input" placeholder="ej: python-scripts" autocomplete="off"/>
-        <p class="field-hint">Se creará: <code id="new-skill-preview-path">skills/nombre/SKILL.md</code></p>
+
+        <label class="field-label" style="margin-top:12px">Directorio destino</label>
+        <select id="new-skill-dir" class="field-input field-select">
+          <option value="">/ raíz</option>
+        </select>
+
+        <p class="field-hint">Se creará: <code id="new-skill-preview-path">nombre/SKILL.md</code></p>
+        <p class="field-hint" style="margin-top:4px;color:var(--accent)">
+          El archivo se guarda en disco al presionar <strong>Guardar</strong> en el editor.
+        </p>
       </div>
       <div class="modal-footer">
         <button class="btn-ghost" data-modal="modal-new-skill">Cancelar</button>
-        <button id="btn-confirm-new-skill" class="btn-primary">Crear skill</button>
+        <button id="btn-confirm-new-skill" class="btn-primary">Abrir en editor</button>
       </div>
     </div>
   </div>
@@ -221,6 +231,7 @@
       <div class="catalog-search-wrap">
         <input id="catalog-search" type="text" placeholder="Buscar en el catálogo..."/>
       </div>
+      <div id="catalog-tags" class="catalog-tags-bar"></div>
       <div id="catalog-body" class="catalog-body">
         <div class="catalog-loading">Cargando catálogo...</div>
       </div>

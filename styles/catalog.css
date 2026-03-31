@@ -168,3 +168,41 @@
   color: var(--text-3);
   flex: 1;
 }
+
+/* TAG FILTER BAR */
+.catalog-tags-bar {
+  padding: 6px 14px 8px;
+  border-bottom: 0.5px solid var(--border);
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  min-height: 36px;
+}
+
+.c-chip {
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--subtle);
+  border: 0.5px solid var(--border-md);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background .12s, color .12s, border-color .12s;
+  white-space: nowrap;
+}
+.c-chip:hover  { background: var(--hover); color: var(--text); }
+.c-chip.active {
+  background: var(--warning-light);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Community badge */
+.c-tag.community {
+  background: var(--primary-light);
+  color: var(--primary);
+  border-color: transparent;
+  font-weight: 500;
+}
