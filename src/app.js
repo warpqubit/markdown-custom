@@ -1,6 +1,6 @@
 // app.js — Orquestador principal — Markdown Custom v1.3
 import { FS } from './fs.js';
-import { searchSkillFiles, fetchSkillContent, parseSkillMetrics, getRateLimit } from './githubSkills.js';
+import { searchSkillFilesAll, fetchSkillContent, parseSkillMetrics, getRateLimit } from './githubSkills.js';
 
 // ---- ESTADO ----
 const S = {
@@ -19,6 +19,9 @@ const S = {
 
 // Estado temporal del modal de instalación de GitHub skills
 const GHI = { item: null, skillName: '', _resolvedName: '' };
+
+// Lock para evitar renders concurrentes (enriquecimiento lazy por página)
+let _gspRendering = false;
 
 // ---- DOM ----
 const el = id => document.getElementById(id);
@@ -311,16 +314,16 @@ function bindEvents() {
   // GitHub pagination
   UI.btnGspPrev.addEventListener('click', () => {
     S.githubPage--;
-    _renderGithubSkills(S.githubSkills);
+    _renderGithubSkills(S.githubSkills).catch(e => toast(e.message, 'error'));
   });
   UI.btnGspNext.addEventListener('click', () => {
     S.githubPage++;
-    _renderGithubSkills(S.githubSkills);
+    _renderGithubSkills(S.githubSkills).catch(e => toast(e.message, 'error'));
   });
   UI.gspPerPage.addEventListener('change', () => {
     S.githubPerPage = +UI.gspPerPage.value;
     S.githubPage    = 1;
-    _renderGithubSkills(S.githubSkills);
+    _renderGithubSkills(S.githubSkills).catch(e => toast(e.message, 'error'));
   });
 
   // Install modal
@@ -801,40 +804,32 @@ async function runGithubSearch() {
   const query = UI.gspSearchInput.value.trim();
   if (!query) { UI.gspSearchInput.focus(); return; }
 
-  S.githubPage = 1;
+  S.githubPage    = 1;
+  S.githubSkills  = [];
   UI.btnGspSearch.disabled    = true;
   UI.btnGspSearch.textContent = '...';
   UI.gspCount.classList.add('hidden');
+  UI.gspPagination.classList.add('hidden');
 
-  // Spinner
-  UI.gspBody.innerHTML = '';
-  const wrap = document.createElement('div');
-  wrap.className = 'gsp-loading';
-  const sp  = document.createElement('div');
-  sp.className = 'gsp-spinner';
-  wrap.appendChild(sp);
-  wrap.appendChild(document.createTextNode(`Buscando "${query}"...`));
-  UI.gspBody.appendChild(wrap);
+  // Spinner inicial
+  const loadInfo = _showGspLoading(`Buscando "${query}"...`);
 
   try {
-    // 1. Buscar
-    const results = await searchSkillFiles(query, S.githubToken);
-
-    // 2. Enriquecer con contenido + métricas
-    const enriched = [];
-    for (const item of results) {
-      try {
-        const content = await fetchSkillContent(item.fullName, item.path, S.githubToken);
-        const metrics = parseSkillMetrics(content);
-        enriched.push({ ...item, content, metrics });
-      } catch (_) {
-        enriched.push({ ...item, content: null,
-          metrics: { name: '', description: '', wordCount: 0, hasExamples: false, hasTriggers: false } });
+    // 1. Buscar TODOS los resultados disponibles (metadata only, sin contenido)
+    //    onPage: actualiza el mensaje de carga conforme llegan páginas
+    const results = await searchSkillFilesAll(
+      query,
+      S.githubToken,
+      300,
+      (fetched, total) => {
+        loadInfo.textContent = `Encontrados ${fetched} de ${Math.min(total, 300)}...`;
       }
-    }
+    );
 
-    S.githubSkills = enriched;
-    _renderGithubSkills(enriched);
+    S.githubSkills = results;
+
+    // 2. Renderizar primera página (enriquece lazily los items de esa página)
+    await _renderGithubSkills(S.githubSkills);
 
     // 3. Rate limit
     try {
@@ -856,37 +851,84 @@ async function runGithubSearch() {
   }
 }
 
-function _renderGithubSkills(items) {
+/** Muestra spinner de carga en el panel y devuelve el nodo de texto editable */
+function _showGspLoading(msg) {
   UI.gspBody.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.className = 'gsp-loading';
+  const sp = document.createElement('div');
+  sp.className = 'gsp-spinner';
+  const txt = document.createTextNode(msg);
+  wrap.appendChild(sp);
+  wrap.appendChild(txt);
+  UI.gspBody.appendChild(wrap);
+  return txt;
+}
 
-  if (!items.length) {
-    UI.gspCount.classList.add('hidden');
-    UI.gspPagination.classList.add('hidden');
-    const empty = document.createElement('div');
-    empty.className   = 'gsp-empty';
-    empty.textContent = 'Sin resultados. Probá otro término.';
-    UI.gspBody.appendChild(empty);
-    return;
+async function _renderGithubSkills(items) {
+  // Evitar renders concurrentes mientras se enriquece una página
+  if (_gspRendering) return;
+  _gspRendering = true;
+
+  try {
+    UI.gspBody.innerHTML = '';
+
+    if (!items.length) {
+      UI.gspCount.classList.add('hidden');
+      UI.gspPagination.classList.add('hidden');
+      const empty = document.createElement('div');
+      empty.className   = 'gsp-empty';
+      empty.textContent = 'Sin resultados. Probá otro término.';
+      UI.gspBody.appendChild(empty);
+      return;
+    }
+
+    const total      = items.length;
+    const perPage    = S.githubPerPage;
+    const totalPages = Math.ceil(total / perPage);
+    S.githubPage     = Math.min(Math.max(1, S.githubPage), totalPages);
+    const start      = (S.githubPage - 1) * perPage;
+    const end        = Math.min(start + perPage, total);
+    const pageItems  = items.slice(start, end);
+
+    // Actualizar controles de paginación
+    UI.gspCount.textContent = total;
+    UI.gspCount.classList.remove('hidden');
+    UI.gspPagination.classList.remove('hidden');
+    UI.gspPageInfo.textContent  = `${start + 1}–${end} de ${total}`;
+    UI.btnGspPrev.disabled      = S.githubPage <= 1;
+    UI.btnGspNext.disabled      = S.githubPage >= totalPages;
+    UI.gspPerPage.value         = String(perPage);
+
+    // Enriquecimiento lazy: solo los items de esta página que aún no tienen contenido
+    const toEnrich = pageItems.filter(item => !item._enriched);
+    if (toEnrich.length > 0) {
+      const txt = _showGspLoading(`Cargando ${toEnrich.length} skills...`);
+      let done = 0;
+
+      for (const item of toEnrich) {
+        try {
+          const content = await fetchSkillContent(item.fullName, item.path, S.githubToken);
+          const metrics = parseSkillMetrics(content);
+          Object.assign(item, { content, metrics, _enriched: true });
+        } catch (_) {
+          Object.assign(item, {
+            content:   null,
+            metrics:   { name: '', description: '', wordCount: 0, hasExamples: false, hasTriggers: false },
+            _enriched: true,
+          });
+        }
+        done++;
+        txt.textContent = `Cargando skills... ${done}/${toEnrich.length}`;
+      }
+      UI.gspBody.innerHTML = '';
+    }
+
+    pageItems.forEach(item => UI.gspBody.appendChild(_buildGithubCard(item)));
+
+  } finally {
+    _gspRendering = false;
   }
-
-  const total      = items.length;
-  const perPage    = S.githubPerPage;
-  const totalPages = Math.ceil(total / perPage);
-  S.githubPage     = Math.min(Math.max(1, S.githubPage), totalPages);
-  const start      = (S.githubPage - 1) * perPage;
-  const end        = Math.min(start + perPage, total);
-  const pageItems  = items.slice(start, end);
-
-  UI.gspCount.textContent = total;
-  UI.gspCount.classList.remove('hidden');
-
-  UI.gspPagination.classList.remove('hidden');
-  UI.gspPageInfo.textContent  = `${start + 1}–${end} de ${total}`;
-  UI.btnGspPrev.disabled      = S.githubPage <= 1;
-  UI.btnGspNext.disabled      = S.githubPage >= totalPages;
-  UI.gspPerPage.value         = String(perPage);
-
-  pageItems.forEach(item => UI.gspBody.appendChild(_buildGithubCard(item)));
 }
 
 function _buildGithubCard(item) {

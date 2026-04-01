@@ -25,31 +25,73 @@ async function _apiFetch(url, token = '') {
 }
 
 /**
- * Busca archivos SKILL.md en repos públicos de GitHub filtrando por query.
- * @param {string} query   Término de búsqueda (nombre del skill)
- * @param {string} token   Token de autenticación
- * @returns {Promise<Array<{repo, fullName, path, stars, forks, updatedAt}>>}
+ * Decodifica base64 a UTF-8 correctamente (atob() sólo maneja Latin-1).
  */
-export async function searchSkillFiles(query = '', token = '') {
-  const term = query.trim()
-    ? `${query.trim()} filename:SKILL.md`
-    : 'filename:SKILL.md';
-  const data = await _apiFetch(
-    `${BASE}/search/code?q=${encodeURIComponent(term)}&per_page=20`,
-    token
-  );
-  return (data.items || []).map(item => ({
+function _b64ToUtf8(b64) {
+  const binary = atob(b64);
+  const bytes  = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+function _mapItem(item) {
+  return {
     repo:      item.repository.full_name,
     fullName:  item.repository.full_name,
     path:      item.path,
     stars:     item.repository.stargazers_count ?? 0,
     forks:     item.repository.forks_count      ?? 0,
     updatedAt: item.repository.updated_at        ?? '',
-  }));
+    // content y metrics se rellenan lazily desde app.js
+    content:   null,
+    metrics:   null,
+    _enriched: false,
+  };
+}
+
+/**
+ * Busca archivos SKILL.md en repos públicos de GitHub.
+ * Itera páginas de 100 hasta agotar resultados o alcanzar maxItems.
+ * @param {string}   query     Término de búsqueda
+ * @param {string}   token     PAT de GitHub
+ * @param {number}   maxItems  Máximo de resultados a traer (default 300)
+ * @param {Function} onPage    Callback opcional llamado tras cada página: onPage(fetched, total)
+ * @returns {Promise<Array>}
+ */
+export async function searchSkillFilesAll(query = '', token = '', maxItems = 300, onPage = null) {
+  const term = query.trim()
+    ? `${query.trim()} filename:SKILL.md`
+    : 'filename:SKILL.md';
+
+  const allItems = [];
+  let page = 1;
+
+  while (allItems.length < maxItems) {
+    const data = await _apiFetch(
+      `${BASE}/search/code?q=${encodeURIComponent(term)}&per_page=100&page=${page}`,
+      token
+    );
+
+    const items = (data.items || []).map(_mapItem);
+    allItems.push(...items);
+
+    if (onPage) onPage(allItems.length, data.total_count ?? allItems.length);
+
+    // ¿Hay más páginas?
+    if (items.length < 100) break;
+    if (allItems.length >= maxItems) break;
+
+    page++;
+    // Pausa para respetar el rate-limit de search (30 req/min con auth)
+    await new Promise(r => setTimeout(r, 500));
+  }
+
+  return allItems;
 }
 
 /**
  * Lee el contenido de un SKILL.md desde la API de GitHub.
+ * Usa TextDecoder para decodificar UTF-8 correctamente.
  * @returns {Promise<string>} Markdown decodificado
  */
 export async function fetchSkillContent(fullName, path, token = '') {
@@ -58,7 +100,7 @@ export async function fetchSkillContent(fullName, path, token = '') {
     token
   );
   if (!data.content) throw new Error('No se pudo obtener el contenido del archivo.');
-  return atob(data.content.replace(/\n/g, ''));
+  return _b64ToUtf8(data.content.replace(/\n/g, ''));
 }
 
 /**
