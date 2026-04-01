@@ -187,9 +187,12 @@ function initResizers() {
     }
   );
 
-  // Restaurar ancho guardado del sidebar
+  // Restaurar ancho guardado del sidebar (validado)
   const saved = localStorage.getItem('mc_sidebar_w');
-  if (saved) document.documentElement.style.setProperty('--sidebar-w', saved + 'px');
+  if (saved) {
+    const width = Math.min(Math.max(parseInt(saved, 10), 160), 480);
+    if (!isNaN(width)) document.documentElement.style.setProperty('--sidebar-w', width + 'px');
+  }
 }
 
 function setupResizer(handle, getStart, applyWidth) {
@@ -387,10 +390,15 @@ function renderList(filter = '') {
   UI.skillsCount.textContent = S.skills.filter(s => !s.virtual).length;
 
   if (!list.length) {
-    const msg = q
-      ? 'Sin resultados'
-      : 'No hay archivos .md.<br/>Creá uno con <b>+</b> o desde el catálogo.';
-    UI.skillList.innerHTML = `<li class="skill-empty">${msg}</li>`;
+    UI.skillList.innerHTML = '';
+    const li = document.createElement('li');
+    li.className = 'skill-empty';
+    if (q) {
+      li.textContent = 'Sin resultados';
+    } else {
+      li.innerHTML = 'No hay archivos .md.<br/>Creá uno con <b>+</b> o importá uno.';
+    }
+    UI.skillList.appendChild(li);
     return;
   }
 
