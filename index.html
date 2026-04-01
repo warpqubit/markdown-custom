@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="author" content="Warpqubit Software"/>
+  <meta name="description" content="Markdown Custom — gestor de archivos .md desarrollado por Warpqubit Software"/>
   <title>Markdown Custom</title>
 
   <!-- Anti-FOUC: aplicar tema antes de renderizar -->
@@ -200,6 +202,18 @@
       </div>
     </div>
 
+    <!-- FOOTER: WARPQUBIT BRANDING -->
+    <footer id="app-footer">
+      <div class="footer-inner">
+        <img src="assets/warpqubit-logo.png" alt="Warpqubit Software" class="footer-logo"/>
+        <span class="footer-brand">Warpqubit Software</span>
+        <span class="footer-sep">·</span>
+        <span class="footer-app">Markdown Custom v1.3</span>
+        <span class="footer-spacer"></span>
+        <a href="mailto:warpqubit@gmail.com" class="footer-email">warpqubit@gmail.com</a>
+      </div>
+    </footer>
+
   </div>
 
   <!-- MODAL: NUEVO ARCHIVO -->
@@ -361,6 +375,7 @@
   <div id="toast-container"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
   <script type="module" src="src/app.js"></script>
 </body>
 </html>

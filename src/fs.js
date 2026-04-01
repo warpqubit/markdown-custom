@@ -1,4 +1,10 @@
-// fs.js — File System Access API
+/**
+ * Markdown Custom — fs.js
+ * Capa de abstracción sobre la File System Access API.
+ *
+ * Developed by Warpqubit Software
+ * © 2025 Warpqubit — warpqubit@gmail.com
+ */
 export const FS = {
   rootHandle: null,
 
@@ -108,6 +114,8 @@ export const FS = {
   // options.createSubdir: true  → crea subcarpeta + SKILL.md (legacy)
   async materializeSkill(targetDirHandle, skillName, content, options = { createSubdir: false }) {
     if (!targetDirHandle) throw new Error('Handle de directorio inválido');
+    // Defensa en profundidad: rechazar nombres con separadores de ruta o null bytes
+    if (!skillName || /[/\\.\0]/.test(skillName)) throw new Error('Nombre de archivo no permitido');
     if (options.createSubdir === false) {
       const newFile = await targetDirHandle.getFileHandle(`${skillName}.md`, { create: true });
       await this.writeFile(newFile, content);

@@ -1,3 +1,8 @@
+/*
+ * Markdown Custom — main.css
+ * Developed by Warpqubit Software · © 2025 Warpqubit · warpqubit@gmail.com
+ */
+
 /* ============================================================
    VARIABLES DE TEMA — Light (default)
    ============================================================ */
@@ -179,10 +184,58 @@ textarea { font-family: var(--mono); }
 #app-shell {
   height: 100vh;
   display: grid;
-  grid-template-rows: var(--topbar-h) 1fr;
+  grid-template-rows: var(--topbar-h) 1fr auto;
   background: var(--bg);
   transition: var(--theme-transition);
 }
+
+/* ============================================================
+   FOOTER — WARPQUBIT BRANDING
+   ============================================================ */
+#app-footer {
+  background: var(--surface);
+  border-top: 0.5px solid var(--border);
+  flex-shrink: 0;
+  transition: var(--theme-transition);
+}
+.footer-inner {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 14px;
+  height: 30px;
+}
+.footer-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  opacity: .85;
+}
+.footer-brand {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.footer-app {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.footer-sep   { color: var(--border-md); font-size: 10px; }
+.footer-spacer { flex: 1; }
+.footer-email {
+  font-size: 10px;
+  font-family: var(--mono);
+  color: var(--primary);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity .12s;
+}
+.footer-email:hover { opacity: .7; }
 
 /* ============================================================
    TOPBAR

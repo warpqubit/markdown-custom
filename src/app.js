@@ -1,4 +1,11 @@
-// app.js — Orquestador principal — Markdown Custom v1.3
+/**
+ * Markdown Custom — app.js
+ * Orquestador principal de la aplicación.
+ *
+ * Developed by Warpqubit Software
+ * © 2025 Warpqubit — warpqubit@gmail.com
+ * https://github.com/warpqubit/markdown-custom
+ */
 import { FS } from './fs.js';
 import { searchSkillFilesAll, fetchSkillContent, parseSkillMetrics, getRateLimit } from './githubSkills.js';
 
@@ -506,7 +513,15 @@ function onEdit() {
 }
 
 function updatePreview(md) {
-  UI.preview.innerHTML = window.marked ? marked.parse(md) : `<pre>${md}</pre>`;
+  if (!window.marked) {
+    // Fallback seguro: escapar HTML antes de insertar en el DOM
+    UI.preview.innerHTML = `<pre>${escapeHtml(md)}</pre>`;
+    return;
+  }
+  const raw   = marked.parse(md);
+  // Sanitizar con DOMPurify para prevenir XSS en contenido externo (GitHub)
+  const clean = window.DOMPurify ? DOMPurify.sanitize(raw) : raw;
+  UI.preview.innerHTML = clean;
 }
 
 function setStatus(state) {
@@ -1008,10 +1023,21 @@ function _buildGithubCard(item) {
 
   const metricsEl = document.createElement('div');
   metricsEl.className = 'gsp-card-metrics';
-  metricsEl.innerHTML =
-    `<span class="${item.stars > 50 ? 'gsp-metric-hot' : ''}">★ ${item.stars.toLocaleString()}</span>` +
-    ` · <span>↓ ${item.forks.toLocaleString()}</span>` +
-    ` · <span>↻ ${dateStr}</span>`;
+  // Construir con textContent para evitar XSS (stars/forks son números; dateStr viene de Date API)
+  const mStars = document.createElement('span');
+  if (item.stars > 50) mStars.className = 'gsp-metric-hot';
+  mStars.textContent = `★ ${item.stars.toLocaleString()}`;
+  const mSep1  = document.createTextNode(' · ');
+  const mForks = document.createElement('span');
+  mForks.textContent = `↓ ${item.forks.toLocaleString()}`;
+  const mSep2  = document.createTextNode(' · ');
+  const mDate  = document.createElement('span');
+  mDate.textContent = `↻ ${dateStr}`;
+  metricsEl.appendChild(mStars);
+  metricsEl.appendChild(mSep1);
+  metricsEl.appendChild(mForks);
+  metricsEl.appendChild(mSep2);
+  metricsEl.appendChild(mDate);
   footer.appendChild(metricsEl);
 
   const btnInst = document.createElement('button');

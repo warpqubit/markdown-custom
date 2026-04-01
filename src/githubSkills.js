@@ -1,4 +1,10 @@
-// githubSkills.js — GitHub API v3 integration for SKILL.md discovery
+/**
+ * Markdown Custom — githubSkills.js
+ * Integración con GitHub API v3 para descubrimiento de SKILL.md.
+ *
+ * Developed by Warpqubit Software
+ * © 2025 Warpqubit — warpqubit@gmail.com
+ */
 const BASE = 'https://api.github.com';
 
 function _headers(token = '') {

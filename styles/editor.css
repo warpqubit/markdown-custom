@@ -109,8 +109,9 @@
   transition: background 200ms ease, color 200ms ease;
 }
 #editor-textarea::placeholder { color: var(--text-3); }
-#editor-textarea::-webkit-scrollbar { width: 4px; }
-#editor-textarea::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 2px; }
+#editor-textarea::-webkit-scrollbar        { width: 4px; cursor: default; }
+#editor-textarea::-webkit-scrollbar-track  { cursor: default; }
+#editor-textarea::-webkit-scrollbar-thumb  { background: var(--border-md); border-radius: 2px; cursor: default; }
 
 /* PREVIEW PANE */
 #editor-preview {
@@ -123,8 +124,9 @@
   background: var(--surface);
   transition: background 200ms ease, color 200ms ease;
 }
-#editor-preview::-webkit-scrollbar { width: 4px; }
-#editor-preview::-webkit-scrollbar-thumb { background: var(--border-md); border-radius: 2px; }
+#editor-preview::-webkit-scrollbar        { width: 4px; cursor: default; }
+#editor-preview::-webkit-scrollbar-track  { cursor: default; }
+#editor-preview::-webkit-scrollbar-thumb  { background: var(--border-md); border-radius: 2px; cursor: default; }
 
 /* Preview typography */
 #editor-preview h1 {
